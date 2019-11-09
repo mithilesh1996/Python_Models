@@ -1,0 +1,3572 @@
+Mithilesh S Dharmale
+
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "/Users/lalitsachan/anaconda/lib/python3.5/site-packages/sklearn/cross_validation.py:44: DeprecationWarning: This module was deprecated in version 0.18 in favor of the model_selection module into which all the refactored classes and functions are moved. Also note that the interface of the new CV iterators are different from that of this module. This module will be removed in 0.20.\n",
+      "  \"This module will be removed in 0.20.\", DeprecationWarning)\n"
+     ]
+    }
+   ],
+   "source": [
+    "import pandas as pd\n",
+    "import numpy as np\n",
+    "from sklearn.model_selection import RandomizedSearchCV\n",
+    "from sklearn.ensemble import GradientBoostingClassifier\n",
+    "from xgboost.sklearn import XGBClassifier"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "# data prep from previous module\n",
+    "file=r'~/Dropbox/0.0 Data/census_income.csv'\n",
+    "\n",
+    "ci=pd.read_csv(file)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "# there is perfect correspondance between education and education.num, we'll drop education\n",
+    "ci.drop('education',axis=1,inplace=True)\n",
+    "\n",
+    "# convert target Y to 1,0\n",
+    "ci['Y']=(ci['Y']==' >50K').astype(int)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "cat_cols=ci.select_dtypes(['object']).columns "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "Index(['workclass', 'marital.status', 'occupation', 'relationship', 'race',\n",
+       "       'sex', 'native.country'],\n",
+       "      dtype='object')"
+      ]
+     },
+     "execution_count": 5,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "cat_cols"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "workclass\n",
+      "marital.status\n",
+      "occupation\n",
+      "relationship\n",
+      "race\n",
+      "sex\n",
+      "native.country\n"
+     ]
+    }
+   ],
+   "source": [
+    "for col in cat_cols:\n",
+    "    freqs=ci[col].value_counts()\n",
+    "    selected_cats=freqs.index[freqs>100][:-1]\n",
+    "    \n",
+    "    print(col)\n",
+    "    for cat in selected_cats:\n",
+    "        name=col+'_'+cat\n",
+    "        \n",
+    "        ci[name]=(ci[col]==cat).astype(int)\n",
+    "    del ci[col]\n",
+    "    "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "(32561, 48)"
+      ]
+     },
+     "execution_count": 7,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "ci.shape"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "x_train=ci.drop('Y',axis=1)\n",
+    "\n",
+    "\n",
+    "y_train=ci['Y']\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "gbm_params={'n_estimators':[50,100,200,500,700],\n",
+    "           'learning_rate': [0.01,.05,0.1,0.4,0.8,1],\n",
+    "            'max_depth':[1,2,3,4,5,6],\n",
+    "#             'min_samples_split':[2,5,10,20],\n",
+    "#             'min_samples_leaf':[2,5,10,20],\n",
+    "            'subsample':[0.5,0.8,1],\n",
+    "            'max_features':[5,10,15,20,30,45]\n",
+    "           }\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "gbm=GradientBoostingClassifier()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "random_search=RandomizedSearchCV(gbm,scoring='roc_auc',param_distributions=gbm_params,\n",
+    "                                 cv=5,n_iter=10,\n",
+    "                                 n_jobs=-1)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "random_search.fit(x_train,y_train)\n",
+    "# this might take upto 30-45 miins to finish , if you try cv=10 and larger number for n_iter\n",
+    "# ( dont be impatient :) . Also dont be alarmed if it finishes early :))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "GradientBoostingClassifier(criterion='friedman_mse', init=None,\n",
+    "              learning_rate=0.4, loss='deviance', max_depth=3,\n",
+    "              max_features=20, max_leaf_nodes=None,\n",
+    "              min_impurity_split=1e-07, min_samples_leaf=1,\n",
+    "              min_samples_split=2, min_weight_fraction_leaf=0.0,\n",
+    "              n_estimators=100, presort='auto', random_state=None,\n",
+    "              subsample=0.8, verbose=0, warm_start=False)\n",
+    "              \n",
+    "use the above result in the class, its a result from previous run. This can be definitely different on a rerun. use this to save time in class so that you dont have to wait for the randomised search to finish"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 14,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "def report(results, n_top=3):\n",
+    "    for i in range(1, n_top + 1):\n",
+    "        candidates = np.flatnonzero(results['rank_test_score'] == i)\n",
+    "        for candidate in candidates:\n",
+    "            print(\"Model with rank: {0}\".format(i))\n",
+    "            print(\"Mean validation score: {0:.3f} (std: {1:.5f})\".format(\n",
+    "                  results['mean_test_score'][candidate],\n",
+    "                  results['std_test_score'][candidate]))\n",
+    "            print(\"Parameters: {0}\".format(results['params'][candidate]))\n",
+    "            print(\"\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "report(random_search.cv_results_,5)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "top 5 classfiers from the previous run were as follows : \n",
+    "\n",
+    "Model with rank: 1\n",
+    "\n",
+    "Mean validation score: 0.925 (std: 0.00188)\n",
+    "\n",
+    "Parameters: {'max_features': 20, 'max_depth': 3, 'subsample': 0.8, 'learning_rate': 0.4, 'n_estimators': 100}\n",
+    "\n",
+    "~~~~~~~~~~\n",
+    "\n",
+    "Model with rank: 2\n",
+    "\n",
+    "Mean validation score: 0.924 (std: 0.00121)\n",
+    "\n",
+    "Parameters: {'max_features': 15, 'max_depth': 4, 'subsample': 1, 'learning_rate': 0.4, 'n_estimators': 100}\n",
+    "\n",
+    "~~~~~~~~~~\n",
+    "\n",
+    "Model with rank: 3\n",
+    "\n",
+    "Mean validation score: 0.923 (std: 0.00250)\n",
+    "\n",
+    "Parameters: {'max_features': 5, 'max_depth': 4, 'subsample': 0.5, 'learning_rate': 0.05, 'n_estimators': 500}\n",
+    "\n",
+    "~~~~~~~~~~\n",
+    "\n",
+    "Model with rank: 4\n",
+    "\n",
+    "Mean validation score: 0.914 (std: 0.00290)\n",
+    "\n",
+    "Parameters: {'max_features': 10, 'max_depth': 5, 'subsample': 1, 'learning_rate': 0.05, 'n_estimators': 50}\n",
+    "\n",
+    "~~~~~~~~~~\n",
+    "\n",
+    "Model with rank: 5\n",
+    "\n",
+    "Mean validation score: 0.913 (std: 0.00174)\n",
+    "\n",
+    "Parameters: {'max_features': 30, 'max_depth': 5, 'subsample': 0.8, 'learning_rate': 0.4, 'n_estimators': 200}"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "tentative performance : 0.925 for the best classfier "
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "**Note: you can use the random search predict,predict_proba function to make prediction as randomisedsearchcv automatically fits the best candidate on complete data. If you want to look into feature_importance etc, then fit the best estimator separately**"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Xgboost"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "xgb_params = {  \n",
+    "                \"learning_rate\":[0.01,0.05,0.1,0.3,0.5],\n",
+    "                \"gamma\":[i/10.0 for i in range(0,5)],\n",
+    "                \"max_depth\": [2,3,4,5,6,7,8],\n",
+    "                \"min_child_weight\":[1,2,5,10],\n",
+    "                \"max_delta_step\":[0,1,2,5,10],\n",
+    "                \"subsample\":[i/10.0 for i in range(5,10)],\n",
+    "                \"colsample_bytree\":[i/10.0 for i in range(5,10)],\n",
+    "                \"colsample_bylevel\":[i/10.0 for i in range(5,10)],\n",
+    "                \"reg_lambda\":[1e-5, 1e-2, 0.1, 1, 100], \n",
+    "                \"reg_alpha\":[1e-5, 1e-2, 0.1, 1, 100],\n",
+    "                \"scale_pos_weight\":[1,2,3,4,5,6,7,8,9],\n",
+    "                \"n_estimators\":[100,500,700,1000]\n",
+    "             }\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 17,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "393750000"
+      ]
+     },
+     "execution_count": 17,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "5*5*7*4*5*5*5*5*5*5*9*4"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "xgb=XGBClassifier(objective='binary:logistic')"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "n_iter=10\n",
+    "\n",
+    "random_search=RandomizedSearchCV(xgb,n_jobs=-1,cv=5,n_iter=n_iter,scoring='roc_auc',\n",
+    "                                 param_distributions=xgb_params)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 12,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "RandomizedSearchCV(cv=5, error_score='raise',\n",
+       "          estimator=XGBClassifier(base_score=0.5, colsample_bylevel=1, colsample_bytree=1,\n",
+       "       gamma=0, learning_rate=0.1, max_delta_step=0, max_depth=3,\n",
+       "       min_child_weight=1, missing=None, n_estimators=100, nthread=-1,\n",
+       "       objective='binary:logistic', reg_alpha=0, reg_lambda=1,\n",
+       "       scale_pos_weight=1, seed=0, silent=True, subsample=1),\n",
+       "          fit_params={}, iid=True, n_iter=10, n_jobs=-1,\n",
+       "          param_distributions={'reg_lambda': [1e-05, 0.01, 0.1, 1, 100], 'subsample': [0.5, 0.6, 0.7, 0.8, 0.9], 'reg_alpha': [1e-05, 0.01, 0.1, 1, 100], 'max_depth': [2, 3, 4, 5, 6, 7, 8], 'min_child_weight': [1, 2, 5, 10], 'n_estimators': [100, 500, 700, 1000], 'gamma': [0.0, 0.1, 0.2, 0.3, 0.4], 'colsample...6, 0.7, 0.8, 0.9], 'learning_rate': [0.01, 0.05, 0.1, 0.3, 0.5], 'max_delta_step': [0, 1, 2, 5, 10]},\n",
+       "          pre_dispatch='2*n_jobs', random_state=None, refit=True,\n",
+       "          return_train_score=True, scoring='roc_auc', verbose=0)"
+      ]
+     },
+     "execution_count": 12,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "random_search.fit(x_train,y_train)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 15,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Model with rank: 1\n",
+      "Mean validation score: 0.928 (std: 0.00232)\n",
+      "Parameters: {'reg_lambda': 1e-05, 'subsample': 0.9, 'reg_alpha': 1, 'max_depth': 8, 'min_child_weight': 10, 'n_estimators': 1000, 'gamma': 0.1, 'colsample_bylevel': 0.8, 'scale_pos_weight': 2, 'colsample_bytree': 0.5, 'learning_rate': 0.01, 'max_delta_step': 10}\n",
+      "\n",
+      "Model with rank: 2\n",
+      "Mean validation score: 0.927 (std: 0.00160)\n",
+      "Parameters: {'reg_lambda': 1, 'subsample': 0.6, 'reg_alpha': 0.1, 'max_depth': 4, 'min_child_weight': 2, 'n_estimators': 1000, 'gamma': 0.3, 'colsample_bylevel': 0.9, 'scale_pos_weight': 2, 'colsample_bytree': 0.7, 'learning_rate': 0.05, 'max_delta_step': 5}\n",
+      "\n",
+      "Model with rank: 3\n",
+      "Mean validation score: 0.926 (std: 0.00101)\n",
+      "Parameters: {'reg_lambda': 0.1, 'subsample': 0.7, 'reg_alpha': 1e-05, 'max_depth': 5, 'min_child_weight': 5, 'n_estimators': 500, 'gamma': 0.2, 'colsample_bylevel': 0.5, 'scale_pos_weight': 3, 'colsample_bytree': 0.9, 'learning_rate': 0.1, 'max_delta_step': 1}\n",
+      "\n",
+      "Model with rank: 4\n",
+      "Mean validation score: 0.925 (std: 0.00104)\n",
+      "Parameters: {'reg_lambda': 0.1, 'subsample': 0.9, 'reg_alpha': 0.01, 'max_depth': 6, 'min_child_weight': 2, 'n_estimators': 1000, 'gamma': 0.2, 'colsample_bylevel': 0.8, 'scale_pos_weight': 8, 'colsample_bytree': 0.5, 'learning_rate': 0.05, 'max_delta_step': 0}\n",
+      "\n",
+      "Model with rank: 5\n",
+      "Mean validation score: 0.920 (std: 0.00278)\n",
+      "Parameters: {'reg_lambda': 1, 'subsample': 0.8, 'reg_alpha': 0.1, 'max_depth': 5, 'min_child_weight': 5, 'n_estimators': 500, 'gamma': 0.0, 'colsample_bylevel': 0.5, 'scale_pos_weight': 8, 'colsample_bytree': 0.5, 'learning_rate': 0.01, 'max_delta_step': 5}\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "report(random_search.cv_results_,5)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "top 5 classfiers from the previous run \n",
+    "\n",
+    "Model with rank: 1\n",
+    "\n",
+    "Mean validation score: 0.928 (std: 0.00232)\n",
+    "\n",
+    "Parameters: {'reg_lambda': 1e-05, 'subsample': 0.9, 'reg_alpha': 1, 'max_depth': 8, 'min_child_weight': 10, 'n_estimators': 1000, 'gamma': 0.1, 'colsample_bylevel': 0.8, 'scale_pos_weight': 2, 'colsample_bytree': 0.5, 'learning_rate': 0.01, 'max_delta_step': 10}\n",
+    "\n",
+    "____\n",
+    "\n",
+    "Model with rank: 2\n",
+    "\n",
+    "Mean validation score: 0.927 (std: 0.00160)\n",
+    "\n",
+    "Parameters: {'reg_lambda': 1, 'subsample': 0.6, 'reg_alpha': 0.1, 'max_depth': 4, 'min_child_weight': 2, 'n_estimators': 1000, 'gamma': 0.3, 'colsample_bylevel': 0.9, 'scale_pos_weight': 2, 'colsample_bytree': 0.7, 'learning_rate': 0.05, 'max_delta_step': 5}\n",
+    "\n",
+    "____\n",
+    "\n",
+    "Model with rank: 3\n",
+    "\n",
+    "Mean validation score: 0.926 (std: 0.00101)\n",
+    "\n",
+    "Parameters: {'reg_lambda': 0.1, 'subsample': 0.7, 'reg_alpha': 1e-05, 'max_depth': 5, 'min_child_weight': 5, 'n_estimators': 500, 'gamma': 0.2, 'colsample_bylevel': 0.5, 'scale_pos_weight': 3, 'colsample_bytree': 0.9, 'learning_rate': 0.1, 'max_delta_step': 1}\n",
+    "\n",
+    "____\n",
+    "\n",
+    "Model with rank: 4\n",
+    "\n",
+    "Mean validation score: 0.925 (std: 0.00104)\n",
+    "\n",
+    "Parameters: {'reg_lambda': 0.1, 'subsample': 0.9, 'reg_alpha': 0.01, 'max_depth': 6, 'min_child_weight': 2, 'n_estimators': 1000, 'gamma': 0.2, 'colsample_bylevel': 0.8, 'scale_pos_weight': 8, 'colsample_bytree': 0.5, 'learning_rate': 0.05, 'max_delta_step': 0}\n",
+    "\n",
+    "____\n",
+    "\n",
+    "Model with rank: 5\n",
+    "\n",
+    "Mean validation score: 0.920 (std: 0.00278)\n",
+    "\n",
+    "Parameters: {'reg_lambda': 1, 'subsample': 0.8, 'reg_alpha': 0.1, 'max_depth': 5, 'min_child_weight': 5, 'n_estimators': 500, 'gamma': 0.0, 'colsample_bylevel': 0.5, 'scale_pos_weight': 8, 'colsample_bytree': 0.5, 'learning_rate': 0.01, 'max_delta_step': 5}\n",
+    "\n",
+    "____\n",
+    "\n",
+    "tentative performance of best estimator : 0.928\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 16,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "XGBClassifier(base_score=0.5, colsample_bylevel=0.8, colsample_bytree=0.5,\n",
+       "       gamma=0.1, learning_rate=0.01, max_delta_step=10, max_depth=8,\n",
+       "       min_child_weight=10, missing=None, n_estimators=1000, nthread=-1,\n",
+       "       objective='binary:logistic', reg_alpha=1, reg_lambda=1e-05,\n",
+       "       scale_pos_weight=2, seed=0, silent=True, subsample=0.9)"
+      ]
+     },
+     "execution_count": 16,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "random_search.best_estimator_"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "best estimator from the previous run can be copied from here :\n",
+    "\n",
+    "XGBClassifier(base_score=0.5, colsample_bylevel=0.8, colsample_bytree=0.5,\n",
+    "       gamma=0.1, learning_rate=0.01, max_delta_step=10, max_depth=8,\n",
+    "       min_child_weight=10, missing=None, n_estimators=1000, nthread=-1,\n",
+    "       objective='binary:logistic', reg_alpha=1, reg_lambda=1e-05,\n",
+    "       scale_pos_weight=2, seed=0, silent=True, subsample=0.9)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "collapsed": true
+   },
+   "source": [
+    "**Note: you can use the random search predict,predict_proba function to make prediction as randomisedsearchcv automatically fits the best candidate on complete data. If you want to look into feature_importance etc, then fit the best estimator separately**"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Sequential Parameter tuning for xgboost"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "If we tune all the paramters together , there are chances that our results will be much far from the best. There are many parameters where variation doesnt impact the performance too much and we can tune them later once we have fixed values of parameters with volatile performance.\n",
+    "\n",
+    "As a general strtaegy you can start with tuning numer of trees or n_estimators , in case of boosting machines , learning_rate is directly related with n_estimators . A very low learning_rate will need high number of n_estimators . We can start with a decent fixed learning rate and tune n_estimaors for it. \n",
+    "\n",
+    "All can be left as default for now except subsample , colsample_bytree and colsample_bylevel, these are set to default=1, we'll take a more conservative value 0.8"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 18,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "xgb_params = {  \n",
+    "                \"n_estimators\":[100,500,700,900,1000,1200,1500]\n",
+    "             }"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 19,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "xgb1=XGBClassifier(learning_rate=0.1,subsample=0.8,colsample_bylevel=0.8,colsample_bytree=0.8)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 20,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "from sklearn.model_selection import GridSearchCV"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 23,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "grid_search=GridSearchCV(xgb1,cv=5,param_grid=xgb_params,scoring='roc_auc',verbose=2,n_jobs=-1)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 24,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Fitting 5 folds for each of 7 candidates, totalling 35 fits\n",
+      "[CV] n_estimators=100 ................................................\n",
+      "[CV] n_estimators=100 ................................................\n",
+      "[CV] n_estimators=100 ................................................\n",
+      "[CV] n_estimators=100 ................................................\n",
+      "[CV] ................................. n_estimators=100, total=   3.1s\n",
+      "[CV] ................................. n_estimators=100, total=   3.2s\n",
+      "[CV] n_estimators=100 ................................................\n",
+      "[CV] ................................. n_estimators=100, total=   3.2s\n",
+      "[CV] n_estimators=500 ................................................\n",
+      "[CV] n_estimators=500 ................................................\n",
+      "[CV] ................................. n_estimators=100, total=   3.3s\n",
+      "[CV] n_estimators=500 ................................................\n",
+      "[CV] ................................. n_estimators=100, total=   3.1s\n",
+      "[CV] n_estimators=500 ................................................\n",
+      "[CV] ................................. n_estimators=500, total=  14.1s\n",
+      "[CV] ................................. n_estimators=500, total=  14.1s\n",
+      "[CV] n_estimators=500 ................................................\n",
+      "[CV] n_estimators=700 ................................................\n",
+      "[CV] ................................. n_estimators=500, total=  14.2s\n",
+      "[CV] n_estimators=700 ................................................\n",
+      "[CV] ................................. n_estimators=500, total=  14.1s\n",
+      "[CV] n_estimators=700 ................................................\n",
+      "[CV] ................................. n_estimators=500, total=  14.2s\n",
+      "[CV] n_estimators=700 ................................................\n",
+      "[CV] ................................. n_estimators=700, total=  19.8s\n",
+      "[CV] n_estimators=700 ................................................\n",
+      "[CV] ................................. n_estimators=700, total=  19.9s\n",
+      "[CV] n_estimators=900 ................................................\n",
+      "[CV] ................................. n_estimators=700, total=  20.2s\n",
+      "[CV] n_estimators=900 ................................................\n",
+      "[CV] ................................. n_estimators=700, total=  20.3s\n",
+      "[CV] n_estimators=900 ................................................\n",
+      "[CV] ................................. n_estimators=700, total=  20.8s\n",
+      "[CV] n_estimators=900 ................................................\n",
+      "[CV] ................................. n_estimators=900, total=  26.7s\n",
+      "[CV] n_estimators=900 ................................................\n",
+      "[CV] ................................. n_estimators=900, total=  26.7s\n",
+      "[CV] n_estimators=1000 ...............................................\n",
+      "[CV] ................................. n_estimators=900, total=  27.0s\n",
+      "[CV] n_estimators=1000 ...............................................\n",
+      "[CV] ................................. n_estimators=900, total=  26.9s\n",
+      "[CV] n_estimators=1000 ...............................................\n",
+      "[CV] ................................. n_estimators=900, total=  27.3s\n",
+      "[CV] n_estimators=1000 ...............................................\n",
+      "[CV] ................................ n_estimators=1000, total=  30.4s\n",
+      "[CV] n_estimators=1000 ...............................................\n",
+      "[CV] ................................ n_estimators=1000, total=  30.5s\n",
+      "[CV] n_estimators=1200 ...............................................\n",
+      "[CV] ................................ n_estimators=1000, total=  30.3s\n",
+      "[CV] n_estimators=1200 ...............................................\n",
+      "[CV] ................................ n_estimators=1000, total=  30.0s\n",
+      "[CV] n_estimators=1200 ...............................................\n",
+      "[CV] ................................ n_estimators=1000, total=  30.0s\n",
+      "[CV] n_estimators=1200 ...............................................\n",
+      "[CV] ................................ n_estimators=1200, total=  35.1s\n",
+      "[CV] n_estimators=1200 ...............................................\n",
+      "[CV] ................................ n_estimators=1200, total=  35.0s\n",
+      "[CV] n_estimators=1500 ...............................................\n",
+      "[CV] ................................ n_estimators=1200, total=  35.0s\n",
+      "[CV] n_estimators=1500 ...............................................\n",
+      "[CV] ................................ n_estimators=1200, total=  34.7s\n",
+      "[CV] n_estimators=1500 ...............................................\n",
+      "[CV] ................................ n_estimators=1200, total=  34.5s\n",
+      "[CV] n_estimators=1500 ...............................................\n",
+      "[CV] ................................ n_estimators=1500, total=  43.0s\n",
+      "[CV] n_estimators=1500 ...............................................\n",
+      "[CV] ................................ n_estimators=1500, total=  43.4s\n",
+      "[CV] ................................ n_estimators=1500, total=  43.1s\n",
+      "[CV] ................................ n_estimators=1500, total=  36.5s\n",
+      "[CV] ................................ n_estimators=1500, total=  30.0s\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  35 out of  35 | elapsed:  3.9min finished\n"
+     ]
+    },
+    {
+     "data": {
+      "text/plain": [
+       "GridSearchCV(cv=5, error_score='raise',\n",
+       "       estimator=XGBClassifier(base_score=0.5, colsample_bylevel=0.8, colsample_bytree=0.8,\n",
+       "       gamma=0, learning_rate=0.1, max_delta_step=0, max_depth=3,\n",
+       "       min_child_weight=1, missing=None, n_estimators=100, nthread=-1,\n",
+       "       objective='binary:logistic', reg_alpha=0, reg_lambda=1,\n",
+       "       scale_pos_weight=1, seed=0, silent=True, subsample=0.8),\n",
+       "       fit_params={}, iid=True, n_jobs=-1,\n",
+       "       param_grid={'n_estimators': [100, 500, 700, 900, 1000, 1200, 1500]},\n",
+       "       pre_dispatch='2*n_jobs', refit=True, return_train_score=True,\n",
+       "       scoring='roc_auc', verbose=2)"
+      ]
+     },
+     "execution_count": 24,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "grid_search.fit(x_train,y_train)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 27,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Model with rank: 1\n",
+      "Mean validation score: 0.929 (std: 0.00198)\n",
+      "Parameters: {'n_estimators': 500}\n",
+      "\n",
+      "Model with rank: 2\n",
+      "Mean validation score: 0.928 (std: 0.00175)\n",
+      "Parameters: {'n_estimators': 700}\n",
+      "\n",
+      "Model with rank: 3\n",
+      "Mean validation score: 0.928 (std: 0.00150)\n",
+      "Parameters: {'n_estimators': 900}\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "report(grid_search.cv_results_,3)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "we got n_estimator=500 as best with learning_rate=0.1  . Next we'll tune max_depth,gamma and min_child_weight, which control overfit by controlling size of individual trees"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 28,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "xgb_params={\n",
+    "            \"gamma\":[0,2,5,8,10],\n",
+    "            \"max_depth\": [2,3,4,5,6,7,8],\n",
+    "            \"min_child_weight\":[0.5,1,2,5,10]\n",
+    "            }"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 30,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "xgb2=XGBClassifier(learning_rate=0.1,n_estimators=500,subsample=0.8,colsample_bylevel=0.8,colsample_bytree=0.8)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 32,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "random_search=RandomizedSearchCV(xgb2,param_distributions=xgb_params,n_iter=20,cv=5,scoring='roc_auc',\n",
+    "                                 n_jobs=-1,verbose=2)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 33,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Fitting 5 folds for each of 20 candidates, totalling 100 fits\n",
+      "[CV] min_child_weight=10, gamma=2, max_depth=7 .......................\n",
+      "[CV] min_child_weight=10, gamma=2, max_depth=7 .......................\n",
+      "[CV] min_child_weight=10, gamma=2, max_depth=7 .......................\n",
+      "[CV] min_child_weight=10, gamma=2, max_depth=7 .......................\n",
+      "[CV] ........ min_child_weight=10, gamma=2, max_depth=7, total=  30.3s\n",
+      "[CV] min_child_weight=10, gamma=2, max_depth=7 .......................\n",
+      "[CV] ........ min_child_weight=10, gamma=2, max_depth=7, total=  30.4s\n",
+      "[CV] min_child_weight=10, gamma=5, max_depth=6 .......................\n",
+      "[CV] ........ min_child_weight=10, gamma=2, max_depth=7, total=  30.5s\n",
+      "[CV] min_child_weight=10, gamma=5, max_depth=6 .......................\n",
+      "[CV] ........ min_child_weight=10, gamma=2, max_depth=7, total=  30.5s\n",
+      "[CV] min_child_weight=10, gamma=5, max_depth=6 .......................\n",
+      "[CV] ........ min_child_weight=10, gamma=5, max_depth=6, total=  25.8s\n",
+      "[CV] min_child_weight=10, gamma=5, max_depth=6 .......................\n",
+      "[CV] ........ min_child_weight=10, gamma=5, max_depth=6, total=  25.8s\n",
+      "[CV] min_child_weight=10, gamma=5, max_depth=6 .......................\n",
+      "[CV] ........ min_child_weight=10, gamma=5, max_depth=6, total=  26.0s\n",
+      "[CV] min_child_weight=5, gamma=10, max_depth=8 .......................\n",
+      "[CV] ........ min_child_weight=10, gamma=2, max_depth=7, total=  30.8s\n",
+      "[CV] min_child_weight=5, gamma=10, max_depth=8 .......................\n",
+      "[CV] ........ min_child_weight=10, gamma=5, max_depth=6, total=  27.1s\n",
+      "[CV] min_child_weight=5, gamma=10, max_depth=8 .......................\n",
+      "[CV] ........ min_child_weight=10, gamma=5, max_depth=6, total=  27.1s\n",
+      "[CV] min_child_weight=5, gamma=10, max_depth=8 .......................\n",
+      "[CV] ........ min_child_weight=5, gamma=10, max_depth=8, total=  36.2s\n",
+      "[CV] min_child_weight=5, gamma=10, max_depth=8 .......................\n",
+      "[CV] ........ min_child_weight=5, gamma=10, max_depth=8, total=  36.2s\n",
+      "[CV] min_child_weight=10, gamma=2, max_depth=6 .......................\n",
+      "[CV] ........ min_child_weight=5, gamma=10, max_depth=8, total=  36.0s\n",
+      "[CV] min_child_weight=10, gamma=2, max_depth=6 .......................\n",
+      "[CV] ........ min_child_weight=5, gamma=10, max_depth=8, total=  36.2s\n",
+      "[CV] min_child_weight=10, gamma=2, max_depth=6 .......................\n",
+      "[CV] ........ min_child_weight=10, gamma=2, max_depth=6, total=  27.3s\n",
+      "[CV] min_child_weight=10, gamma=2, max_depth=6 .......................\n",
+      "[CV] ........ min_child_weight=5, gamma=10, max_depth=8, total=  35.5s\n",
+      "[CV] min_child_weight=10, gamma=2, max_depth=6 .......................\n",
+      "[CV] ........ min_child_weight=10, gamma=2, max_depth=6, total=  27.5s\n",
+      "[CV] min_child_weight=1, gamma=2, max_depth=8 ........................\n",
+      "[CV] ........ min_child_weight=10, gamma=2, max_depth=6, total=  27.6s\n",
+      "[CV] min_child_weight=1, gamma=2, max_depth=8 ........................\n",
+      "[CV] ........ min_child_weight=10, gamma=2, max_depth=6, total=  28.2s\n",
+      "[CV] min_child_weight=1, gamma=2, max_depth=8 ........................\n",
+      "[CV] ........ min_child_weight=10, gamma=2, max_depth=6, total=  28.6s\n",
+      "[CV] min_child_weight=1, gamma=2, max_depth=8 ........................\n",
+      "[CV] ......... min_child_weight=1, gamma=2, max_depth=8, total=  39.4s\n",
+      "[CV] min_child_weight=1, gamma=2, max_depth=8 ........................\n",
+      "[CV] ......... min_child_weight=1, gamma=2, max_depth=8, total=  39.4s\n",
+      "[CV] min_child_weight=1, gamma=2, max_depth=7 ........................\n",
+      "[CV] ......... min_child_weight=1, gamma=2, max_depth=8, total=  39.4s\n",
+      "[CV] min_child_weight=1, gamma=2, max_depth=7 ........................\n",
+      "[CV] ......... min_child_weight=1, gamma=2, max_depth=8, total=  38.7s\n",
+      "[CV] min_child_weight=1, gamma=2, max_depth=7 ........................\n",
+      "[CV] ......... min_child_weight=1, gamma=2, max_depth=7, total=  34.8s\n",
+      "[CV] min_child_weight=1, gamma=2, max_depth=7 ........................\n",
+      "[CV] ......... min_child_weight=1, gamma=2, max_depth=8, total=  39.7s\n",
+      "[CV] min_child_weight=1, gamma=2, max_depth=7 ........................\n",
+      "[CV] ......... min_child_weight=1, gamma=2, max_depth=7, total=  35.1s\n",
+      "[CV] min_child_weight=10, gamma=8, max_depth=8 .......................\n",
+      "[CV] ......... min_child_weight=1, gamma=2, max_depth=7, total=  35.6s\n",
+      "[CV] min_child_weight=10, gamma=8, max_depth=8 .......................\n",
+      "[CV] ......... min_child_weight=1, gamma=2, max_depth=7, total=  32.9s\n",
+      "[CV] min_child_weight=10, gamma=8, max_depth=8 .......................\n",
+      "[CV] ......... min_child_weight=1, gamma=2, max_depth=7, total=  32.8s\n",
+      "[CV] min_child_weight=10, gamma=8, max_depth=8 .......................\n",
+      "[CV] ........ min_child_weight=10, gamma=8, max_depth=8, total=  35.8s\n",
+      "[CV] min_child_weight=10, gamma=8, max_depth=8 .......................\n",
+      "[CV] ........ min_child_weight=10, gamma=8, max_depth=8, total=  34.9s\n",
+      "[CV] min_child_weight=1, gamma=0, max_depth=3 ........................\n",
+      "[CV] ......... min_child_weight=1, gamma=0, max_depth=3, total=  15.9s\n",
+      "[CV] min_child_weight=1, gamma=0, max_depth=3 ........................\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  33 tasks      | elapsed:  4.8min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV] ........ min_child_weight=10, gamma=8, max_depth=8, total=  36.4s\n",
+      "[CV] min_child_weight=1, gamma=0, max_depth=3 ........................\n",
+      "[CV] ........ min_child_weight=10, gamma=8, max_depth=8, total=  36.1s\n",
+      "[CV] min_child_weight=1, gamma=0, max_depth=3 ........................\n",
+      "[CV] ......... min_child_weight=1, gamma=0, max_depth=3, total=  14.2s\n",
+      "[CV] min_child_weight=1, gamma=0, max_depth=3 ........................\n",
+      "[CV] ........ min_child_weight=10, gamma=8, max_depth=8, total=  36.3s\n",
+      "[CV] min_child_weight=10, gamma=8, max_depth=3 .......................\n",
+      "[CV] ......... min_child_weight=1, gamma=0, max_depth=3, total=  14.2s\n",
+      "[CV] min_child_weight=10, gamma=8, max_depth=3 .......................\n",
+      "[CV] ......... min_child_weight=1, gamma=0, max_depth=3, total=  14.3s\n",
+      "[CV] min_child_weight=10, gamma=8, max_depth=3 .......................\n",
+      "[CV] ......... min_child_weight=1, gamma=0, max_depth=3, total=  14.5s\n",
+      "[CV] min_child_weight=10, gamma=8, max_depth=3 .......................\n",
+      "[CV] ........ min_child_weight=10, gamma=8, max_depth=3, total=  14.3s\n",
+      "[CV] min_child_weight=10, gamma=8, max_depth=3 .......................\n",
+      "[CV] ........ min_child_weight=10, gamma=8, max_depth=3, total=  14.5s\n",
+      "[CV] min_child_weight=1, gamma=8, max_depth=3 ........................\n",
+      "[CV] ........ min_child_weight=10, gamma=8, max_depth=3, total=  14.5s\n",
+      "[CV] min_child_weight=1, gamma=8, max_depth=3 ........................\n",
+      "[CV] ........ min_child_weight=10, gamma=8, max_depth=3, total=  14.5s\n",
+      "[CV] min_child_weight=1, gamma=8, max_depth=3 ........................\n",
+      "[CV] ........ min_child_weight=10, gamma=8, max_depth=3, total=  14.8s\n",
+      "[CV] min_child_weight=1, gamma=8, max_depth=3 ........................\n",
+      "[CV] ......... min_child_weight=1, gamma=8, max_depth=3, total=  15.6s\n",
+      "[CV] min_child_weight=1, gamma=8, max_depth=3 ........................\n",
+      "[CV] ......... min_child_weight=1, gamma=8, max_depth=3, total=  16.2s\n",
+      "[CV] min_child_weight=1, gamma=10, max_depth=3 .......................\n",
+      "[CV] ......... min_child_weight=1, gamma=8, max_depth=3, total=  16.0s\n",
+      "[CV] min_child_weight=1, gamma=10, max_depth=3 .......................\n",
+      "[CV] ......... min_child_weight=1, gamma=8, max_depth=3, total=  16.1s\n",
+      "[CV] min_child_weight=1, gamma=10, max_depth=3 .......................\n",
+      "[CV] ......... min_child_weight=1, gamma=8, max_depth=3, total=  15.6s\n",
+      "[CV] min_child_weight=1, gamma=10, max_depth=3 .......................\n",
+      "[CV] ........ min_child_weight=1, gamma=10, max_depth=3, total=  15.2s\n",
+      "[CV] min_child_weight=1, gamma=10, max_depth=3 .......................\n",
+      "[CV] ........ min_child_weight=1, gamma=10, max_depth=3, total=  15.2s\n",
+      "[CV] min_child_weight=1, gamma=8, max_depth=5 ........................\n",
+      "[CV] ........ min_child_weight=1, gamma=10, max_depth=3, total=  14.9s\n",
+      "[CV] min_child_weight=1, gamma=8, max_depth=5 ........................\n",
+      "[CV] ........ min_child_weight=1, gamma=10, max_depth=3, total=  14.9s\n",
+      "[CV] min_child_weight=1, gamma=8, max_depth=5 ........................\n",
+      "[CV] ........ min_child_weight=1, gamma=10, max_depth=3, total=  14.7s\n",
+      "[CV] min_child_weight=1, gamma=8, max_depth=5 ........................\n",
+      "[CV] ......... min_child_weight=1, gamma=8, max_depth=5, total=  22.5s\n",
+      "[CV] min_child_weight=1, gamma=8, max_depth=5 ........................\n",
+      "[CV] ......... min_child_weight=1, gamma=8, max_depth=5, total=  22.6s\n",
+      "[CV] min_child_weight=5, gamma=2, max_depth=2 ........................\n",
+      "[CV] ......... min_child_weight=1, gamma=8, max_depth=5, total=  22.4s\n",
+      "[CV] min_child_weight=5, gamma=2, max_depth=2 ........................\n",
+      "[CV] ......... min_child_weight=5, gamma=2, max_depth=2, total=  10.2s\n",
+      "[CV] min_child_weight=5, gamma=2, max_depth=2 ........................\n",
+      "[CV] ......... min_child_weight=1, gamma=8, max_depth=5, total=  22.4s\n",
+      "[CV] min_child_weight=5, gamma=2, max_depth=2 ........................\n",
+      "[CV] ......... min_child_weight=5, gamma=2, max_depth=2, total=  10.2s\n",
+      "[CV] min_child_weight=5, gamma=2, max_depth=2 ........................\n",
+      "[CV] ......... min_child_weight=1, gamma=8, max_depth=5, total=  22.4s\n",
+      "[CV] min_child_weight=5, gamma=8, max_depth=2 ........................\n",
+      "[CV] ......... min_child_weight=5, gamma=2, max_depth=2, total=  10.5s\n",
+      "[CV] min_child_weight=5, gamma=8, max_depth=2 ........................\n",
+      "[CV] ......... min_child_weight=5, gamma=2, max_depth=2, total=  10.5s\n",
+      "[CV] min_child_weight=5, gamma=8, max_depth=2 ........................\n",
+      "[CV] ......... min_child_weight=5, gamma=2, max_depth=2, total=  10.5s\n",
+      "[CV] min_child_weight=5, gamma=8, max_depth=2 ........................\n",
+      "[CV] ......... min_child_weight=5, gamma=8, max_depth=2, total=  10.1s\n",
+      "[CV] min_child_weight=5, gamma=8, max_depth=2 ........................\n",
+      "[CV] ......... min_child_weight=5, gamma=8, max_depth=2, total=  10.3s\n",
+      "[CV] ......... min_child_weight=5, gamma=8, max_depth=2, total=  10.3s\n",
+      "[CV] min_child_weight=2, gamma=10, max_depth=4 .......................\n",
+      "[CV] min_child_weight=2, gamma=10, max_depth=4 .......................\n",
+      "[CV] ......... min_child_weight=5, gamma=8, max_depth=2, total=  10.6s\n",
+      "[CV] min_child_weight=2, gamma=10, max_depth=4 .......................\n",
+      "[CV] ......... min_child_weight=5, gamma=8, max_depth=2, total=  10.8s\n",
+      "[CV] min_child_weight=2, gamma=10, max_depth=4 .......................\n",
+      "[CV] ........ min_child_weight=2, gamma=10, max_depth=4, total=  18.9s\n",
+      "[CV] min_child_weight=2, gamma=10, max_depth=4 .......................\n",
+      "[CV] ........ min_child_weight=2, gamma=10, max_depth=4, total=  19.0s\n",
+      "[CV] min_child_weight=2, gamma=10, max_depth=8 .......................\n",
+      "[CV] ........ min_child_weight=2, gamma=10, max_depth=4, total=  18.8s\n",
+      "[CV] min_child_weight=2, gamma=10, max_depth=8 .......................\n",
+      "[CV] ........ min_child_weight=2, gamma=10, max_depth=4, total=  18.7s\n",
+      "[CV] min_child_weight=2, gamma=10, max_depth=8 .......................\n",
+      "[CV] ........ min_child_weight=2, gamma=10, max_depth=4, total=  19.4s\n",
+      "[CV] min_child_weight=2, gamma=10, max_depth=8 .......................\n",
+      "[CV] ........ min_child_weight=2, gamma=10, max_depth=8, total=  40.2s\n",
+      "[CV] min_child_weight=2, gamma=10, max_depth=8 .......................\n",
+      "[CV] ........ min_child_weight=2, gamma=10, max_depth=8, total=  40.4s\n",
+      "[CV] min_child_weight=5, gamma=8, max_depth=8 ........................\n",
+      "[CV] ........ min_child_weight=2, gamma=10, max_depth=8, total=  40.7s\n",
+      "[CV] min_child_weight=5, gamma=8, max_depth=8 ........................\n",
+      "[CV] ........ min_child_weight=2, gamma=10, max_depth=8, total=  41.2s\n",
+      "[CV] min_child_weight=5, gamma=8, max_depth=8 ........................\n",
+      "[CV] ........ min_child_weight=2, gamma=10, max_depth=8, total=  38.5s\n",
+      "[CV] min_child_weight=5, gamma=8, max_depth=8 ........................\n",
+      "[CV] ......... min_child_weight=5, gamma=8, max_depth=8, total=  37.3s\n",
+      "[CV] min_child_weight=5, gamma=8, max_depth=8 ........................\n",
+      "[CV] ......... min_child_weight=5, gamma=8, max_depth=8, total=  37.1s\n",
+      "[CV] min_child_weight=2, gamma=8, max_depth=8 ........................\n",
+      "[CV] ......... min_child_weight=5, gamma=8, max_depth=8, total=  35.4s\n",
+      "[CV] min_child_weight=2, gamma=8, max_depth=8 ........................\n",
+      "[CV] ......... min_child_weight=5, gamma=8, max_depth=8, total=  35.1s\n",
+      "[CV] min_child_weight=2, gamma=8, max_depth=8 ........................\n",
+      "[CV] ......... min_child_weight=5, gamma=8, max_depth=8, total=  35.0s\n",
+      "[CV] min_child_weight=2, gamma=8, max_depth=8 ........................\n",
+      "[CV] ......... min_child_weight=2, gamma=8, max_depth=8, total=  35.2s\n",
+      "[CV] min_child_weight=2, gamma=8, max_depth=8 ........................\n",
+      "[CV] ......... min_child_weight=2, gamma=8, max_depth=8, total=  35.1s\n",
+      "[CV] min_child_weight=10, gamma=10, max_depth=8 ......................\n",
+      "[CV] ......... min_child_weight=2, gamma=8, max_depth=8, total=  34.8s\n",
+      "[CV] min_child_weight=10, gamma=10, max_depth=8 ......................\n",
+      "[CV] ......... min_child_weight=2, gamma=8, max_depth=8, total=  34.9s\n",
+      "[CV] min_child_weight=10, gamma=10, max_depth=8 ......................\n",
+      "[CV] ......... min_child_weight=2, gamma=8, max_depth=8, total=  35.2s\n",
+      "[CV] min_child_weight=10, gamma=10, max_depth=8 ......................\n",
+      "[CV] ....... min_child_weight=10, gamma=10, max_depth=8, total=  35.3s\n",
+      "[CV] min_child_weight=10, gamma=10, max_depth=8 ......................\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV] ....... min_child_weight=10, gamma=10, max_depth=8, total=  35.4s\n",
+      "[CV] min_child_weight=2, gamma=8, max_depth=4 ........................\n",
+      "[CV] ....... min_child_weight=10, gamma=10, max_depth=8, total=  35.2s\n",
+      "[CV] min_child_weight=2, gamma=8, max_depth=4 ........................\n",
+      "[CV] ....... min_child_weight=10, gamma=10, max_depth=8, total=  34.9s\n",
+      "[CV] min_child_weight=2, gamma=8, max_depth=4 ........................\n",
+      "[CV] ....... min_child_weight=10, gamma=10, max_depth=8, total=  34.7s\n",
+      "[CV] min_child_weight=2, gamma=8, max_depth=4 ........................\n",
+      "[CV] ......... min_child_weight=2, gamma=8, max_depth=4, total=  18.2s\n",
+      "[CV] min_child_weight=2, gamma=8, max_depth=4 ........................\n",
+      "[CV] ......... min_child_weight=2, gamma=8, max_depth=4, total=  18.1s\n",
+      "[CV] ......... min_child_weight=2, gamma=8, max_depth=4, total=  17.6s\n",
+      "[CV] ......... min_child_weight=2, gamma=8, max_depth=4, total=  13.9s\n",
+      "[CV] ......... min_child_weight=2, gamma=8, max_depth=4, total=  13.6s\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done 100 out of 100 | elapsed: 11.0min finished\n"
+     ]
+    },
+    {
+     "data": {
+      "text/plain": [
+       "RandomizedSearchCV(cv=5, error_score='raise',\n",
+       "          estimator=XGBClassifier(base_score=0.5, colsample_bylevel=0.8, colsample_bytree=0.8,\n",
+       "       gamma=0, learning_rate=0.1, max_delta_step=0, max_depth=3,\n",
+       "       min_child_weight=1, missing=None, n_estimators=500, nthread=-1,\n",
+       "       objective='binary:logistic', reg_alpha=0, reg_lambda=1,\n",
+       "       scale_pos_weight=1, seed=0, silent=True, subsample=0.8),\n",
+       "          fit_params={}, iid=True, n_iter=20, n_jobs=-1,\n",
+       "          param_distributions={'min_child_weight': [1, 2, 5, 10], 'gamma': [0, 2, 5, 8, 10], 'max_depth': [2, 3, 4, 5, 6, 7, 8]},\n",
+       "          pre_dispatch='2*n_jobs', random_state=None, refit=True,\n",
+       "          return_train_score=True, scoring='roc_auc', verbose=2)"
+      ]
+     },
+     "execution_count": 33,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "random_search.fit(x_train,y_train)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 34,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Model with rank: 1\n",
+      "Mean validation score: 0.929 (std: 0.00198)\n",
+      "Parameters: {'min_child_weight': 1, 'gamma': 0, 'max_depth': 3}\n",
+      "\n",
+      "Model with rank: 2\n",
+      "Mean validation score: 0.928 (std: 0.00219)\n",
+      "Parameters: {'min_child_weight': 1, 'gamma': 8, 'max_depth': 5}\n",
+      "\n",
+      "Model with rank: 3\n",
+      "Mean validation score: 0.928 (std: 0.00220)\n",
+      "Parameters: {'min_child_weight': 2, 'gamma': 8, 'max_depth': 8}\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "report(random_search.cv_results_,3)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "we got best values for parameters being tuned as follows : {'min_child_weight': 1, 'gamma': 0, 'max_depth': 3}"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Since there is imbalance in the data , we'll look into max_delta_step and scale_pos_weight next"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 35,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "0    24720\n",
+       "1     7841\n",
+       "Name: Y, dtype: int64"
+      ]
+     },
+     "execution_count": 35,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "y_train.value_counts()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "3.152659099604642"
+      ]
+     },
+     "execution_count": 1,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "24720/7841"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 37,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "xgb_params={\n",
+    "            'max_delta_step':[0,1,3,6,10],\n",
+    "            'scale_pos_weight':[1,2,3,4]\n",
+    "            }"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 38,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "xgb3=XGBClassifier(learning_rate=0.1,n_estimators=500,min_child_weight=1,gamma=0,max_depth=3,\n",
+    "                  subsample=0.8,colsample_bylevel=0.8,colsample_bytree=0.8)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 39,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "grid_search=GridSearchCV(xgb3,param_grid=xgb_params,cv=5,scoring='roc_auc',n_jobs=-1,verbose=10)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 40,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Fitting 5 folds for each of 20 candidates, totalling 100 fits\n",
+      "[CV] scale_pos_weight=1, max_delta_step=0 ............................\n",
+      "[CV] scale_pos_weight=1, max_delta_step=0 ............................\n",
+      "[CV] scale_pos_weight=1, max_delta_step=0 ............................\n",
+      "[CV] scale_pos_weight=1, max_delta_step=0 ............................\n",
+      "[CV]  scale_pos_weight=1, max_delta_step=0, score=0.925546, total=  15.0s\n",
+      "[CV] scale_pos_weight=1, max_delta_step=0 ............................\n",
+      "[CV]  scale_pos_weight=1, max_delta_step=0, score=0.927150, total=  15.1s\n",
+      "[CV] scale_pos_weight=2, max_delta_step=0 ............................\n",
+      "[CV]  scale_pos_weight=1, max_delta_step=0, score=0.929289, total=  15.1s\n",
+      "[CV] scale_pos_weight=2, max_delta_step=0 ............................\n",
+      "[CV]  scale_pos_weight=1, max_delta_step=0, score=0.930334, total=  15.1s\n",
+      "[CV] scale_pos_weight=2, max_delta_step=0 ............................\n",
+      "[CV]  scale_pos_weight=2, max_delta_step=0, score=0.926805, total=  14.0s\n",
+      "[CV]  scale_pos_weight=1, max_delta_step=0, score=0.930756, total=  14.1s\n",
+      "[CV] scale_pos_weight=2, max_delta_step=0 ............................\n",
+      "[CV] scale_pos_weight=2, max_delta_step=0 ............................\n",
+      "[CV]  scale_pos_weight=2, max_delta_step=0, score=0.925963, total=  14.1s\n",
+      "[CV] scale_pos_weight=3, max_delta_step=0 ............................\n",
+      "[CV]  scale_pos_weight=2, max_delta_step=0, score=0.928917, total=  14.1s\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done   5 tasks      | elapsed:   30.4s\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV] scale_pos_weight=3, max_delta_step=0 ............................\n",
+      "[CV]  scale_pos_weight=2, max_delta_step=0, score=0.929909, total=  14.0s\n",
+      "[CV] scale_pos_weight=3, max_delta_step=0 ............................\n",
+      "[CV]  scale_pos_weight=2, max_delta_step=0, score=0.930364, total=  14.0s\n",
+      "[CV] scale_pos_weight=3, max_delta_step=0 ............................\n",
+      "[CV]  scale_pos_weight=3, max_delta_step=0, score=0.926377, total=  13.9s\n",
+      "[CV] scale_pos_weight=3, max_delta_step=0 ............................\n",
+      "[CV]  scale_pos_weight=3, max_delta_step=0, score=0.925140, total=  13.9s\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  10 tasks      | elapsed:   45.0s\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV] scale_pos_weight=4, max_delta_step=0 ............................\n",
+      "[CV]  scale_pos_weight=3, max_delta_step=0, score=0.929139, total=  14.3s\n",
+      "[CV] scale_pos_weight=4, max_delta_step=0 ............................\n",
+      "[CV]  scale_pos_weight=3, max_delta_step=0, score=0.928417, total=  14.4s\n",
+      "[CV] scale_pos_weight=4, max_delta_step=0 ............................\n",
+      "[CV]  scale_pos_weight=3, max_delta_step=0, score=0.930026, total=  14.4s\n",
+      "[CV] scale_pos_weight=4, max_delta_step=0 ............................\n",
+      "[CV]  scale_pos_weight=4, max_delta_step=0, score=0.926012, total=  14.4s\n",
+      "[CV] scale_pos_weight=4, max_delta_step=0 ............................\n",
+      "[CV]  scale_pos_weight=4, max_delta_step=0, score=0.924847, total=  14.4s\n",
+      "[CV]  scale_pos_weight=4, max_delta_step=0, score=0.928628, total=  14.3s\n",
+      "[CV] scale_pos_weight=1, max_delta_step=1 ............................\n",
+      "[CV] scale_pos_weight=1, max_delta_step=1 ............................\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  17 tasks      | elapsed:  1.2min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  scale_pos_weight=4, max_delta_step=0, score=0.930365, total=  14.4s\n",
+      "[CV]  scale_pos_weight=4, max_delta_step=0, score=0.929363, total=  14.4s\n",
+      "[CV] scale_pos_weight=1, max_delta_step=1 ............................\n",
+      "[CV] scale_pos_weight=1, max_delta_step=1 ............................\n",
+      "[CV]  scale_pos_weight=1, max_delta_step=1, score=0.926478, total=  14.5s\n",
+      "[CV] scale_pos_weight=1, max_delta_step=1 ............................\n",
+      "[CV]  scale_pos_weight=1, max_delta_step=1, score=0.925399, total=  14.6s\n",
+      "[CV] scale_pos_weight=2, max_delta_step=1 ............................\n",
+      "[CV]  scale_pos_weight=1, max_delta_step=1, score=0.929922, total=  14.5s\n",
+      "[CV] scale_pos_weight=2, max_delta_step=1 ............................\n",
+      "[CV]  scale_pos_weight=1, max_delta_step=1, score=0.928864, total=  14.6s\n",
+      "[CV] scale_pos_weight=2, max_delta_step=1 ............................\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  24 tasks      | elapsed:  1.5min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  scale_pos_weight=1, max_delta_step=1, score=0.930937, total=  14.7s\n",
+      "[CV] scale_pos_weight=2, max_delta_step=1 ............................\n",
+      "[CV]  scale_pos_weight=2, max_delta_step=1, score=0.926517, total=  14.7s\n",
+      "[CV] scale_pos_weight=2, max_delta_step=1 ............................\n",
+      "[CV]  scale_pos_weight=2, max_delta_step=1, score=0.928968, total=  14.7s\n",
+      "[CV] scale_pos_weight=3, max_delta_step=1 ............................\n",
+      "[CV]  scale_pos_weight=2, max_delta_step=1, score=0.925069, total=  14.7s\n",
+      "[CV] scale_pos_weight=3, max_delta_step=1 ............................\n",
+      "[CV]  scale_pos_weight=2, max_delta_step=1, score=0.929966, total=  14.5s\n",
+      "[CV] scale_pos_weight=3, max_delta_step=1 ............................\n",
+      "[CV]  scale_pos_weight=2, max_delta_step=1, score=0.930696, total=  14.5s\n",
+      "[CV] scale_pos_weight=3, max_delta_step=1 ............................\n",
+      "[CV]  scale_pos_weight=3, max_delta_step=1, score=0.926344, total=  14.4s\n",
+      "[CV] scale_pos_weight=3, max_delta_step=1 ............................\n",
+      "[CV]  scale_pos_weight=3, max_delta_step=1, score=0.925098, total=  14.5s\n",
+      "[CV] scale_pos_weight=4, max_delta_step=1 ............................\n",
+      "[CV]  scale_pos_weight=3, max_delta_step=1, score=0.928758, total=  14.9s\n",
+      "[CV] scale_pos_weight=4, max_delta_step=1 ............................\n",
+      "[CV]  scale_pos_weight=3, max_delta_step=1, score=0.929893, total=  14.9s\n",
+      "[CV] scale_pos_weight=4, max_delta_step=1 ............................\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  33 tasks      | elapsed:  2.3min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  scale_pos_weight=3, max_delta_step=1, score=0.930228, total=  14.9s\n",
+      "[CV] scale_pos_weight=4, max_delta_step=1 ............................\n",
+      "[CV]  scale_pos_weight=4, max_delta_step=1, score=0.926225, total=  14.9s\n",
+      "[CV] scale_pos_weight=4, max_delta_step=1 ............................\n",
+      "[CV]  scale_pos_weight=4, max_delta_step=1, score=0.924855, total=  14.3s\n",
+      "[CV] scale_pos_weight=1, max_delta_step=3 ............................\n",
+      "[CV]  scale_pos_weight=4, max_delta_step=1, score=0.928668, total=  14.4s\n",
+      "[CV]  scale_pos_weight=4, max_delta_step=1, score=0.929045, total=  14.2s\n",
+      "[CV] scale_pos_weight=1, max_delta_step=3 ............................\n",
+      "[CV] scale_pos_weight=1, max_delta_step=3 ............................\n",
+      "[CV]  scale_pos_weight=4, max_delta_step=1, score=0.930402, total=  14.3s\n",
+      "[CV] scale_pos_weight=1, max_delta_step=3 ............................\n",
+      "[CV]  scale_pos_weight=1, max_delta_step=3, score=0.926924, total=  14.4s\n",
+      "[CV] scale_pos_weight=1, max_delta_step=3 ............................\n",
+      "[CV]  scale_pos_weight=1, max_delta_step=3, score=0.925654, total=  14.3s\n",
+      "[CV] scale_pos_weight=2, max_delta_step=3 ............................\n",
+      "[CV]  scale_pos_weight=1, max_delta_step=3, score=0.929423, total=  14.3s\n",
+      "[CV] scale_pos_weight=2, max_delta_step=3 ............................\n",
+      "[CV]  scale_pos_weight=1, max_delta_step=3, score=0.929742, total=  14.3s\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  42 tasks      | elapsed:  2.8min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV] scale_pos_weight=2, max_delta_step=3 ............................\n",
+      "[CV]  scale_pos_weight=1, max_delta_step=3, score=0.930460, total=  14.6s\n",
+      "[CV] scale_pos_weight=2, max_delta_step=3 ............................\n",
+      "[CV]  scale_pos_weight=2, max_delta_step=3, score=0.926899, total=  14.5s\n",
+      "[CV] scale_pos_weight=2, max_delta_step=3 ............................\n",
+      "[CV]  scale_pos_weight=2, max_delta_step=3, score=0.925719, total=  14.5s\n",
+      "[CV] scale_pos_weight=3, max_delta_step=3 ............................\n",
+      "[CV]  scale_pos_weight=2, max_delta_step=3, score=0.928916, total=  14.5s\n",
+      "[CV] scale_pos_weight=3, max_delta_step=3 ............................\n",
+      "[CV]  scale_pos_weight=2, max_delta_step=3, score=0.930475, total=  14.9s\n",
+      "[CV] scale_pos_weight=3, max_delta_step=3 ............................\n",
+      "[CV]  scale_pos_weight=2, max_delta_step=3, score=0.930038, total=  15.0s\n",
+      "[CV] scale_pos_weight=3, max_delta_step=3 ............................\n",
+      "[CV]  scale_pos_weight=3, max_delta_step=3, score=0.926233, total=  14.9s\n",
+      "[CV] scale_pos_weight=3, max_delta_step=3 ............................\n",
+      "[CV]  scale_pos_weight=3, max_delta_step=3, score=0.925140, total=  14.9s\n",
+      "[CV] scale_pos_weight=4, max_delta_step=3 ............................\n",
+      "[CV]  scale_pos_weight=3, max_delta_step=3, score=0.929505, total=  14.5s\n",
+      "[CV]  scale_pos_weight=3, max_delta_step=3, score=0.928417, total=  14.6s\n",
+      "[CV] scale_pos_weight=4, max_delta_step=3 ............................\n",
+      "[CV] scale_pos_weight=4, max_delta_step=3 ............................\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  53 tasks      | elapsed:  3.5min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  scale_pos_weight=3, max_delta_step=3, score=0.930298, total=  14.5s\n",
+      "[CV] scale_pos_weight=4, max_delta_step=3 ............................\n",
+      "[CV]  scale_pos_weight=4, max_delta_step=3, score=0.925980, total=  14.5s\n",
+      "[CV] scale_pos_weight=4, max_delta_step=3 ............................\n",
+      "[CV]  scale_pos_weight=4, max_delta_step=3, score=0.924854, total=  15.7s\n",
+      "[CV] scale_pos_weight=1, max_delta_step=6 ............................\n",
+      "[CV]  scale_pos_weight=4, max_delta_step=3, score=0.928556, total=  15.9s\n",
+      "[CV]  scale_pos_weight=4, max_delta_step=3, score=0.929226, total=  15.7s\n",
+      "[CV] scale_pos_weight=1, max_delta_step=6 ............................\n",
+      "[CV] scale_pos_weight=1, max_delta_step=6 ............................\n",
+      "[CV]  scale_pos_weight=4, max_delta_step=3, score=0.929632, total=  15.7s\n",
+      "[CV] scale_pos_weight=1, max_delta_step=6 ............................\n",
+      "[CV]  scale_pos_weight=1, max_delta_step=6, score=0.927150, total=  14.7s\n",
+      "[CV] scale_pos_weight=1, max_delta_step=6 ............................\n",
+      "[CV]  scale_pos_weight=1, max_delta_step=6, score=0.929289, total=  14.7s\n",
+      "[CV] scale_pos_weight=2, max_delta_step=6 ............................\n",
+      "[CV]  scale_pos_weight=1, max_delta_step=6, score=0.925546, total=  14.7s\n",
+      "[CV] scale_pos_weight=2, max_delta_step=6 ............................\n",
+      "[CV]  scale_pos_weight=1, max_delta_step=6, score=0.930334, total=  14.7s\n",
+      "[CV] scale_pos_weight=2, max_delta_step=6 ............................\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  64 tasks      | elapsed:  4.1min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  scale_pos_weight=1, max_delta_step=6, score=0.930756, total=  15.0s\n",
+      "[CV] scale_pos_weight=2, max_delta_step=6 ............................\n",
+      "[CV]  scale_pos_weight=2, max_delta_step=6, score=0.926805, total=  15.0s\n",
+      "[CV]  scale_pos_weight=2, max_delta_step=6, score=0.925963, total=  15.0s\n",
+      "[CV] scale_pos_weight=2, max_delta_step=6 ............................\n",
+      "[CV] scale_pos_weight=3, max_delta_step=6 ............................\n",
+      "[CV]  scale_pos_weight=2, max_delta_step=6, score=0.928917, total=  15.1s\n",
+      "[CV] scale_pos_weight=3, max_delta_step=6 ............................\n",
+      "[CV]  scale_pos_weight=2, max_delta_step=6, score=0.929909, total=  14.5s\n",
+      "[CV] scale_pos_weight=3, max_delta_step=6 ............................\n",
+      "[CV]  scale_pos_weight=2, max_delta_step=6, score=0.930364, total=  14.4s\n",
+      "[CV] scale_pos_weight=3, max_delta_step=6 ............................\n",
+      "[CV]  scale_pos_weight=3, max_delta_step=6, score=0.926377, total=  14.4s\n",
+      "[CV] scale_pos_weight=3, max_delta_step=6 ............................\n",
+      "[CV]  scale_pos_weight=3, max_delta_step=6, score=0.925140, total=  14.4s\n",
+      "[CV] scale_pos_weight=4, max_delta_step=6 ............................\n",
+      "[CV]  scale_pos_weight=3, max_delta_step=6, score=0.928417, total=  14.8s\n",
+      "[CV] scale_pos_weight=4, max_delta_step=6 ............................\n",
+      "[CV]  scale_pos_weight=3, max_delta_step=6, score=0.929139, total=  14.8s\n",
+      "[CV] scale_pos_weight=4, max_delta_step=6 ............................\n",
+      "[CV]  scale_pos_weight=3, max_delta_step=6, score=0.930026, total=  14.8s\n",
+      "[CV] scale_pos_weight=4, max_delta_step=6 ............................\n",
+      "[CV]  scale_pos_weight=4, max_delta_step=6, score=0.926012, total=  14.8s\n",
+      "[CV] scale_pos_weight=4, max_delta_step=6 ............................\n",
+      "[CV]  scale_pos_weight=4, max_delta_step=6, score=0.924847, total=  14.5s\n",
+      "[CV] scale_pos_weight=1, max_delta_step=10 ...........................\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  77 tasks      | elapsed:  5.1min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  scale_pos_weight=4, max_delta_step=6, score=0.928628, total=  14.5s\n",
+      "[CV] scale_pos_weight=1, max_delta_step=10 ...........................\n",
+      "[CV]  scale_pos_weight=4, max_delta_step=6, score=0.929363, total=  14.5s\n",
+      "[CV] scale_pos_weight=1, max_delta_step=10 ...........................\n",
+      "[CV]  scale_pos_weight=4, max_delta_step=6, score=0.930365, total=  14.5s\n",
+      "[CV] scale_pos_weight=1, max_delta_step=10 ...........................\n",
+      "[CV]  scale_pos_weight=1, max_delta_step=10, score=0.927150, total=  14.5s\n",
+      "[CV] scale_pos_weight=1, max_delta_step=10 ...........................\n",
+      "[CV]  scale_pos_weight=1, max_delta_step=10, score=0.925546, total=  14.5s\n",
+      "[CV] scale_pos_weight=2, max_delta_step=10 ...........................\n",
+      "[CV]  scale_pos_weight=1, max_delta_step=10, score=0.929289, total=  14.5s\n",
+      "[CV] scale_pos_weight=2, max_delta_step=10 ...........................\n",
+      "[CV]  scale_pos_weight=1, max_delta_step=10, score=0.930334, total=  14.4s\n",
+      "[CV] scale_pos_weight=2, max_delta_step=10 ...........................\n",
+      "[CV]  scale_pos_weight=1, max_delta_step=10, score=0.930756, total=  14.5s\n",
+      "[CV] scale_pos_weight=2, max_delta_step=10 ...........................\n",
+      "[CV]  scale_pos_weight=2, max_delta_step=10, score=0.926805, total=  14.5s\n",
+      "[CV]  scale_pos_weight=2, max_delta_step=10, score=0.925963, total=  14.5s\n",
+      "[CV] scale_pos_weight=2, max_delta_step=10 ...........................\n",
+      "[CV] scale_pos_weight=3, max_delta_step=10 ...........................\n",
+      "[CV]  scale_pos_weight=2, max_delta_step=10, score=0.928917, total=  14.5s\n",
+      "[CV] scale_pos_weight=3, max_delta_step=10 ...........................\n",
+      "[CV]  scale_pos_weight=2, max_delta_step=10, score=0.929909, total=  14.6s\n",
+      "[CV] scale_pos_weight=3, max_delta_step=10 ...........................\n",
+      "[CV]  scale_pos_weight=3, max_delta_step=10, score=0.926377, total=  14.5s\n",
+      "[CV] scale_pos_weight=3, max_delta_step=10 ...........................\n",
+      "[CV]  scale_pos_weight=2, max_delta_step=10, score=0.930364, total=  14.7s\n",
+      "[CV] scale_pos_weight=3, max_delta_step=10 ...........................\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  90 tasks      | elapsed:  5.8min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  scale_pos_weight=3, max_delta_step=10, score=0.925140, total=  14.6s\n",
+      "[CV] scale_pos_weight=4, max_delta_step=10 ...........................\n",
+      "[CV]  scale_pos_weight=3, max_delta_step=10, score=0.928417, total=  14.5s\n",
+      "[CV] scale_pos_weight=4, max_delta_step=10 ...........................\n",
+      "[CV]  scale_pos_weight=3, max_delta_step=10, score=0.929139, total=  14.6s\n",
+      "[CV] scale_pos_weight=4, max_delta_step=10 ...........................\n",
+      "[CV]  scale_pos_weight=3, max_delta_step=10, score=0.930026, total=  14.5s\n",
+      "[CV] scale_pos_weight=4, max_delta_step=10 ...........................\n",
+      "[CV]  scale_pos_weight=4, max_delta_step=10, score=0.926012, total=  14.5s\n",
+      "[CV] scale_pos_weight=4, max_delta_step=10 ...........................\n",
+      "[CV]  scale_pos_weight=4, max_delta_step=10, score=0.924847, total=  15.2s\n",
+      "[CV]  scale_pos_weight=4, max_delta_step=10, score=0.928628, total=  15.2s\n",
+      "[CV]  scale_pos_weight=4, max_delta_step=10, score=0.929363, total=  15.1s\n",
+      "[CV]  scale_pos_weight=4, max_delta_step=10, score=0.930365, total=  15.0s\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done 100 out of 100 | elapsed:  6.4min finished\n"
+     ]
+    },
+    {
+     "data": {
+      "text/plain": [
+       "GridSearchCV(cv=5, error_score='raise',\n",
+       "       estimator=XGBClassifier(base_score=0.5, colsample_bylevel=0.8, colsample_bytree=0.8,\n",
+       "       gamma=0, learning_rate=0.1, max_delta_step=0, max_depth=3,\n",
+       "       min_child_weight=1, missing=None, n_estimators=500, nthread=-1,\n",
+       "       objective='binary:logistic', reg_alpha=0, reg_lambda=1,\n",
+       "       scale_pos_weight=1, seed=0, silent=True, subsample=0.8),\n",
+       "       fit_params={}, iid=True, n_jobs=-1,\n",
+       "       param_grid={'scale_pos_weight': [1, 2, 3, 4], 'max_delta_step': [0, 1, 3, 6, 10]},\n",
+       "       pre_dispatch='2*n_jobs', refit=True, return_train_score=True,\n",
+       "       scoring='roc_auc', verbose=10)"
+      ]
+     },
+     "execution_count": 40,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "grid_search.fit(x_train,y_train)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 41,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Model with rank: 1\n",
+      "Mean validation score: 0.929 (std: 0.00198)\n",
+      "Parameters: {'scale_pos_weight': 1, 'max_delta_step': 0}\n",
+      "\n",
+      "Model with rank: 1\n",
+      "Mean validation score: 0.929 (std: 0.00198)\n",
+      "Parameters: {'scale_pos_weight': 1, 'max_delta_step': 6}\n",
+      "\n",
+      "Model with rank: 1\n",
+      "Mean validation score: 0.929 (std: 0.00198)\n",
+      "Parameters: {'scale_pos_weight': 1, 'max_delta_step': 10}\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "report(grid_search.cv_results_,3)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "it turns out that , since imbalance was not that severe , defaults come out as best choices {'scale_pos_weight': 1, 'max_delta_step': 0}"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Next we check the effect of the noise on data and tune , subsample , colsample_bytree and colsample_bylevel"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 46,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "xgb_params={\n",
+    "            'subsample':[i/10 for i in range(5,11)],\n",
+    "            'colsample_bytree':[i/10 for i in range(5,11)],\n",
+    "            'colsample_bylevel':[i/10 for i in range(5,11)]\n",
+    "            }"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 47,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "xgb4=XGBClassifier(learning_rate=0.1,n_estimators=500,min_child_weight=1,gamma=0,max_depth=3,\n",
+    "                        scale_pos_weight=1,max_delta_step=0\n",
+    "                  )"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 50,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "random_search=RandomizedSearchCV(xgb4,param_distributions=xgb_params,cv=5,n_iter=20,scoring='roc_auc',\n",
+    "                                n_jobs=-1,verbose=20)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 51,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Fitting 5 folds for each of 20 candidates, totalling 100 fits\n",
+      "[CV] colsample_bylevel=0.7, colsample_bytree=0.9, subsample=0.9 ......\n",
+      "[CV] colsample_bylevel=0.7, colsample_bytree=0.9, subsample=0.9 ......\n",
+      "[CV] colsample_bylevel=0.7, colsample_bytree=0.9, subsample=0.9 ......\n",
+      "[CV] colsample_bylevel=0.7, colsample_bytree=0.9, subsample=0.9 ......\n",
+      "[CV]  colsample_bylevel=0.7, colsample_bytree=0.9, subsample=0.9, score=0.926707, total=  13.7s\n",
+      "[CV] colsample_bylevel=0.7, colsample_bytree=0.9, subsample=0.9 ......\n",
+      "[CV]  colsample_bylevel=0.7, colsample_bytree=0.9, subsample=0.9, score=0.925189, total=  13.7s\n",
+      "[CV] colsample_bylevel=0.8, colsample_bytree=0.9, subsample=0.5 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done   1 tasks      | elapsed:   14.3s\n",
+      "[Parallel(n_jobs=-1)]: Done   2 tasks      | elapsed:   14.4s\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.7, colsample_bytree=0.9, subsample=0.9, score=0.928683, total=  13.8s\n",
+      "[CV] colsample_bylevel=0.8, colsample_bytree=0.9, subsample=0.5 ......\n",
+      "[CV]  colsample_bylevel=0.7, colsample_bytree=0.9, subsample=0.9, score=0.930187, total=  13.8s\n",
+      "[CV] colsample_bylevel=0.8, colsample_bytree=0.9, subsample=0.5 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done   3 tasks      | elapsed:   14.5s\n",
+      "[Parallel(n_jobs=-1)]: Done   4 tasks      | elapsed:   14.6s\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.7, colsample_bytree=0.9, subsample=0.9, score=0.930366, total=  13.6s\n",
+      "[CV] colsample_bylevel=0.8, colsample_bytree=0.9, subsample=0.5 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done   5 tasks      | elapsed:   28.5s\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.8, colsample_bytree=0.9, subsample=0.5, score=0.925816, total=  16.6s\n",
+      "[CV]  colsample_bylevel=0.8, colsample_bytree=0.9, subsample=0.5, score=0.923226, total=  16.5s\n",
+      "[CV] colsample_bylevel=0.8, colsample_bytree=0.9, subsample=0.5 ......\n",
+      "[CV] colsample_bylevel=0.6, colsample_bytree=1.0, subsample=0.9 ......\n",
+      "[CV]  colsample_bylevel=0.8, colsample_bytree=0.9, subsample=0.5, score=0.926847, total=  16.5s\n",
+      "[CV] colsample_bylevel=0.6, colsample_bytree=1.0, subsample=0.9 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done   6 tasks      | elapsed:   31.6s\n",
+      "[Parallel(n_jobs=-1)]: Done   7 tasks      | elapsed:   31.6s\n",
+      "[Parallel(n_jobs=-1)]: Done   8 tasks      | elapsed:   31.8s\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.6, colsample_bytree=1.0, subsample=0.9, score=0.927289, total=  13.5s\n",
+      "[CV] colsample_bylevel=0.6, colsample_bytree=1.0, subsample=0.9 ......\n",
+      "[CV]  colsample_bylevel=0.6, colsample_bytree=1.0, subsample=0.9, score=0.925029, total=  13.5s\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done   9 tasks      | elapsed:   45.7s\n",
+      "[Parallel(n_jobs=-1)]: Done  10 tasks      | elapsed:   45.9s\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV] colsample_bylevel=0.6, colsample_bytree=1.0, subsample=0.9 ......\n",
+      "[CV]  colsample_bylevel=0.8, colsample_bytree=0.9, subsample=0.5, score=0.928817, total=  17.0s\n",
+      "[CV] colsample_bylevel=0.6, colsample_bytree=1.0, subsample=0.9 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  11 tasks      | elapsed:   46.1s\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.8, colsample_bytree=0.9, subsample=0.5, score=0.929027, total=  17.1s\n",
+      "[CV] colsample_bylevel=1.0, colsample_bytree=0.9, subsample=0.5 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  12 tasks      | elapsed:   49.3s\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.6, colsample_bytree=1.0, subsample=0.9, score=0.929155, total=  13.7s\n",
+      "[CV] colsample_bylevel=1.0, colsample_bytree=0.9, subsample=0.5 ......\n",
+      "[CV]  colsample_bylevel=0.6, colsample_bytree=1.0, subsample=0.9, score=0.930854, total=  13.6s\n",
+      "[CV] colsample_bylevel=1.0, colsample_bytree=0.9, subsample=0.5 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  13 tasks      | elapsed:   60.0s\n",
+      "[Parallel(n_jobs=-1)]: Done  14 tasks      | elapsed:  1.0min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.6, colsample_bytree=1.0, subsample=0.9, score=0.930411, total=  13.8s\n",
+      "[CV] colsample_bylevel=1.0, colsample_bytree=0.9, subsample=0.5 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  15 tasks      | elapsed:  1.0min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=1.0, colsample_bytree=0.9, subsample=0.5, score=0.925732, total=  20.4s\n",
+      "[CV] colsample_bylevel=1.0, colsample_bytree=0.9, subsample=0.5 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  16 tasks      | elapsed:  1.2min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=1.0, colsample_bytree=0.9, subsample=0.5, score=0.923249, total=  20.1s\n",
+      "[CV] colsample_bylevel=0.7, colsample_bytree=0.5, subsample=0.6 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  17 tasks      | elapsed:  1.3min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=1.0, colsample_bytree=0.9, subsample=0.5, score=0.926846, total=  20.2s\n",
+      "[CV] colsample_bylevel=0.7, colsample_bytree=0.5, subsample=0.6 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  18 tasks      | elapsed:  1.3min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=1.0, colsample_bytree=0.9, subsample=0.5, score=0.928747, total=  20.1s\n",
+      "[CV] colsample_bylevel=0.7, colsample_bytree=0.5, subsample=0.6 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  19 tasks      | elapsed:  1.4min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=1.0, colsample_bytree=0.9, subsample=0.5, score=0.928066, total=  20.5s\n",
+      "[CV] colsample_bylevel=0.7, colsample_bytree=0.5, subsample=0.6 ......\n",
+      "[CV]  colsample_bylevel=0.7, colsample_bytree=0.5, subsample=0.6, score=0.926455, total=  10.2s\n",
+      "[CV] colsample_bylevel=0.7, colsample_bytree=0.5, subsample=0.6 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  20 tasks      | elapsed:  1.5min\n",
+      "[Parallel(n_jobs=-1)]: Done  21 tasks      | elapsed:  1.5min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.7, colsample_bytree=0.5, subsample=0.6, score=0.923908, total=  10.3s\n",
+      "[CV] colsample_bylevel=0.6, colsample_bytree=0.6, subsample=0.5 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  22 tasks      | elapsed:  1.5min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.7, colsample_bytree=0.5, subsample=0.6, score=0.928122, total=  10.3s\n",
+      "[CV] colsample_bylevel=0.6, colsample_bytree=0.6, subsample=0.5 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  23 tasks      | elapsed:  1.5min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.7, colsample_bytree=0.5, subsample=0.6, score=0.929644, total=  10.5s\n",
+      "[CV] colsample_bylevel=0.6, colsample_bytree=0.6, subsample=0.5 ......\n",
+      "[CV]  colsample_bylevel=0.7, colsample_bytree=0.5, subsample=0.6, score=0.929875, total=  10.6s\n",
+      "[CV] colsample_bylevel=0.6, colsample_bytree=0.6, subsample=0.5 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  24 tasks      | elapsed:  1.7min\n",
+      "[Parallel(n_jobs=-1)]: Done  25 tasks      | elapsed:  1.7min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.6, colsample_bytree=0.6, subsample=0.5, score=0.926153, total=  10.5s\n",
+      "[CV] colsample_bylevel=0.6, colsample_bytree=0.6, subsample=0.5 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  26 tasks      | elapsed:  1.7min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.6, colsample_bytree=0.6, subsample=0.5, score=0.924181, total=  10.4s\n",
+      "[CV] colsample_bylevel=0.5, colsample_bytree=0.6, subsample=1.0 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  27 tasks      | elapsed:  1.7min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.5, colsample_bytree=0.6, subsample=1.0, score=0.927206, total=   8.2s\n",
+      "[CV] colsample_bylevel=0.5, colsample_bytree=0.6, subsample=1.0 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  28 tasks      | elapsed:  1.9min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.6, colsample_bytree=0.6, subsample=0.5, score=0.927771, total=  10.5s\n",
+      "[CV] colsample_bylevel=0.5, colsample_bytree=0.6, subsample=1.0 ......\n",
+      "[CV]  colsample_bylevel=0.6, colsample_bytree=0.6, subsample=0.5, score=0.928885, total=  10.6s\n",
+      "[CV] colsample_bylevel=0.5, colsample_bytree=0.6, subsample=1.0 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  29 tasks      | elapsed:  1.9min\n",
+      "[Parallel(n_jobs=-1)]: Done  30 tasks      | elapsed:  1.9min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.6, colsample_bytree=0.6, subsample=0.5, score=0.929115, total=  10.5s\n",
+      "[CV] colsample_bylevel=0.5, colsample_bytree=0.6, subsample=1.0 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  31 tasks      | elapsed:  1.9min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.5, colsample_bytree=0.6, subsample=1.0, score=0.925461, total=   8.4s\n",
+      "[CV] colsample_bylevel=0.8, colsample_bytree=0.7, subsample=0.7 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  32 tasks      | elapsed:  2.0min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.5, colsample_bytree=0.6, subsample=1.0, score=0.929458, total=   8.4s\n",
+      "[CV] colsample_bylevel=0.8, colsample_bytree=0.7, subsample=0.7 ......\n",
+      "[CV]  colsample_bylevel=0.5, colsample_bytree=0.6, subsample=1.0, score=0.930886, total=   8.4s\n",
+      "[CV] colsample_bylevel=0.8, colsample_bytree=0.7, subsample=0.7 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  33 tasks      | elapsed:  2.0min\n",
+      "[Parallel(n_jobs=-1)]: Done  34 tasks      | elapsed:  2.0min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.5, colsample_bytree=0.6, subsample=1.0, score=0.930527, total=   8.4s\n",
+      "[CV] colsample_bylevel=0.8, colsample_bytree=0.7, subsample=0.7 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  35 tasks      | elapsed:  2.0min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.8, colsample_bytree=0.7, subsample=0.7, score=0.926138, total=  13.0s\n",
+      "[CV] colsample_bylevel=0.8, colsample_bytree=0.7, subsample=0.7 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  36 tasks      | elapsed:  2.2min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.8, colsample_bytree=0.7, subsample=0.7, score=0.924628, total=  13.1s\n",
+      "[CV] colsample_bylevel=0.9, colsample_bytree=0.5, subsample=0.7 ......\n",
+      "[CV]  colsample_bylevel=0.8, colsample_bytree=0.7, subsample=0.7, score=0.928058, total=  13.1s\n",
+      "[CV] colsample_bylevel=0.9, colsample_bytree=0.5, subsample=0.7 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  37 tasks      | elapsed:  2.3min\n",
+      "[Parallel(n_jobs=-1)]: Done  38 tasks      | elapsed:  2.3min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.8, colsample_bytree=0.7, subsample=0.7, score=0.930586, total=  13.0s\n",
+      "[CV] colsample_bylevel=0.9, colsample_bytree=0.5, subsample=0.7 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  39 tasks      | elapsed:  2.3min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.9, colsample_bytree=0.5, subsample=0.7, score=0.927173, total=  11.2s\n",
+      "[CV] colsample_bylevel=0.9, colsample_bytree=0.5, subsample=0.7 ......\n",
+      "[CV]  colsample_bylevel=0.9, colsample_bytree=0.5, subsample=0.7, score=0.925106, total=  11.2s\n",
+      "[CV] colsample_bylevel=0.9, colsample_bytree=0.5, subsample=0.7 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  40 tasks      | elapsed:  2.5min\n",
+      "[Parallel(n_jobs=-1)]: Done  41 tasks      | elapsed:  2.5min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.8, colsample_bytree=0.7, subsample=0.7, score=0.929827, total=  13.3s\n",
+      "[CV] colsample_bylevel=0.6, colsample_bytree=1.0, subsample=0.6 ......\n",
+      "[CV]  colsample_bylevel=0.9, colsample_bytree=0.5, subsample=0.7, score=0.929040, total=  11.2s\n",
+      "[CV] colsample_bylevel=0.6, colsample_bytree=1.0, subsample=0.6 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  42 tasks      | elapsed:  2.5min\n",
+      "[Parallel(n_jobs=-1)]: Done  43 tasks      | elapsed:  2.5min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.9, colsample_bytree=0.5, subsample=0.7, score=0.930663, total=  11.1s\n",
+      "[CV] colsample_bylevel=0.6, colsample_bytree=1.0, subsample=0.6 ......\n",
+      "[CV]  colsample_bylevel=0.9, colsample_bytree=0.5, subsample=0.7, score=0.930293, total=  11.1s\n",
+      "[CV] colsample_bylevel=0.6, colsample_bytree=1.0, subsample=0.6 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  44 tasks      | elapsed:  2.7min\n",
+      "[Parallel(n_jobs=-1)]: Done  45 tasks      | elapsed:  2.7min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.6, colsample_bytree=1.0, subsample=0.6, score=0.926781, total=  14.4s\n",
+      "[CV] colsample_bylevel=0.6, colsample_bytree=1.0, subsample=0.6 ......\n",
+      "[CV]  colsample_bylevel=0.6, colsample_bytree=1.0, subsample=0.6, score=0.923842, total=  14.4s\n",
+      "[CV] colsample_bylevel=0.5, colsample_bytree=1.0, subsample=0.8 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  46 tasks      | elapsed:  2.7min\n",
+      "[Parallel(n_jobs=-1)]: Done  47 tasks      | elapsed:  2.7min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.6, colsample_bytree=1.0, subsample=0.6, score=0.926898, total=  14.6s\n",
+      "[CV] colsample_bylevel=0.5, colsample_bytree=1.0, subsample=0.8 ......\n",
+      "[CV]  colsample_bylevel=0.6, colsample_bytree=1.0, subsample=0.6, score=0.929065, total=  14.5s\n",
+      "[CV] colsample_bylevel=0.5, colsample_bytree=1.0, subsample=0.8 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  48 tasks      | elapsed:  2.9min\n",
+      "[Parallel(n_jobs=-1)]: Done  49 tasks      | elapsed:  2.9min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.5, colsample_bytree=1.0, subsample=0.8, score=0.927397, total=  11.8s\n",
+      "[CV] colsample_bylevel=0.5, colsample_bytree=1.0, subsample=0.8 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  50 tasks      | elapsed:  2.9min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.6, colsample_bytree=1.0, subsample=0.6, score=0.928718, total=  14.7s\n",
+      "[CV] colsample_bylevel=0.5, colsample_bytree=1.0, subsample=0.8 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  51 tasks      | elapsed:  3.0min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.5, colsample_bytree=1.0, subsample=0.8, score=0.924793, total=  12.0s\n",
+      "[CV] colsample_bylevel=0.7, colsample_bytree=1.0, subsample=0.6 ......\n",
+      "[CV]  colsample_bylevel=0.5, colsample_bytree=1.0, subsample=0.8, score=0.928545, total=  12.0s\n",
+      "[CV] colsample_bylevel=0.7, colsample_bytree=1.0, subsample=0.6 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  52 tasks      | elapsed:  3.1min\n",
+      "[Parallel(n_jobs=-1)]: Done  53 tasks      | elapsed:  3.1min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.5, colsample_bytree=1.0, subsample=0.8, score=0.930232, total=  12.0s\n",
+      "[CV] colsample_bylevel=0.7, colsample_bytree=1.0, subsample=0.6 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  54 tasks      | elapsed:  3.1min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.5, colsample_bytree=1.0, subsample=0.8, score=0.930010, total=  12.1s\n",
+      "[CV] colsample_bylevel=0.7, colsample_bytree=1.0, subsample=0.6 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  55 tasks      | elapsed:  3.2min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.7, colsample_bytree=1.0, subsample=0.6, score=0.925328, total=  16.2s\n",
+      "[CV] colsample_bylevel=0.7, colsample_bytree=1.0, subsample=0.6 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  56 tasks      | elapsed:  3.4min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.7, colsample_bytree=1.0, subsample=0.6, score=0.924101, total=  16.3s\n",
+      "[CV] colsample_bylevel=0.6, colsample_bytree=0.9, subsample=0.5 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  57 tasks      | elapsed:  3.4min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.7, colsample_bytree=1.0, subsample=0.6, score=0.926589, total=  16.4s\n",
+      "[CV] colsample_bylevel=0.6, colsample_bytree=0.9, subsample=0.5 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  58 tasks      | elapsed:  3.4min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.7, colsample_bytree=1.0, subsample=0.6, score=0.929433, total=  16.3s\n",
+      "[CV] colsample_bylevel=0.6, colsample_bytree=0.9, subsample=0.5 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  59 tasks      | elapsed:  3.5min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.6, colsample_bytree=0.9, subsample=0.5, score=0.925396, total=  13.5s\n",
+      "[CV] colsample_bylevel=0.6, colsample_bytree=0.9, subsample=0.5 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  60 tasks      | elapsed:  3.6min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.6, colsample_bytree=0.9, subsample=0.5, score=0.923290, total=  13.7s\n",
+      "[CV] colsample_bylevel=0.6, colsample_bytree=0.9, subsample=0.5 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  61 tasks      | elapsed:  3.7min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.7, colsample_bytree=1.0, subsample=0.6, score=0.928498, total=  16.7s\n",
+      "[CV] colsample_bylevel=0.9, colsample_bytree=0.7, subsample=0.8 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  62 tasks      | elapsed:  3.7min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.6, colsample_bytree=0.9, subsample=0.5, score=0.927671, total=  13.9s\n",
+      "[CV] colsample_bylevel=0.9, colsample_bytree=0.7, subsample=0.8 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  63 tasks      | elapsed:  3.7min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.6, colsample_bytree=0.9, subsample=0.5, score=0.929246, total=  14.3s\n",
+      "[CV] colsample_bylevel=0.9, colsample_bytree=0.7, subsample=0.8 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  64 tasks      | elapsed:  3.9min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.6, colsample_bytree=0.9, subsample=0.5, score=0.928502, total=  14.1s\n",
+      "[CV] colsample_bylevel=0.9, colsample_bytree=0.7, subsample=0.8 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  65 tasks      | elapsed:  3.9min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.9, colsample_bytree=0.7, subsample=0.8, score=0.926637, total=  14.2s\n",
+      "[CV] colsample_bylevel=0.9, colsample_bytree=0.7, subsample=0.8 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  66 tasks      | elapsed:  3.9min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.9, colsample_bytree=0.7, subsample=0.8, score=0.924893, total=  14.3s\n",
+      "[CV] colsample_bylevel=0.7, colsample_bytree=0.8, subsample=0.7 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  67 tasks      | elapsed:  4.0min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.9, colsample_bytree=0.7, subsample=0.8, score=0.928382, total=  14.3s\n",
+      "[CV] colsample_bylevel=0.7, colsample_bytree=0.8, subsample=0.7 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  68 tasks      | elapsed:  4.1min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.9, colsample_bytree=0.7, subsample=0.8, score=0.930727, total=  14.1s\n",
+      "[CV] colsample_bylevel=0.7, colsample_bytree=0.8, subsample=0.7 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  69 tasks      | elapsed:  4.2min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.9, colsample_bytree=0.7, subsample=0.8, score=0.930968, total=  14.2s\n",
+      "[CV] colsample_bylevel=0.7, colsample_bytree=0.8, subsample=0.7 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  70 tasks      | elapsed:  4.2min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.7, colsample_bytree=0.8, subsample=0.7, score=0.926605, total=  13.7s\n",
+      "[CV] colsample_bylevel=0.7, colsample_bytree=0.8, subsample=0.7 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  71 tasks      | elapsed:  4.2min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.7, colsample_bytree=0.8, subsample=0.7, score=0.925349, total=  13.7s\n",
+      "[CV] colsample_bylevel=0.8, colsample_bytree=0.7, subsample=0.5 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  72 tasks      | elapsed:  4.4min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.7, colsample_bytree=0.8, subsample=0.7, score=0.928040, total=  13.7s\n",
+      "[CV] colsample_bylevel=0.8, colsample_bytree=0.7, subsample=0.5 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  73 tasks      | elapsed:  4.4min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.7, colsample_bytree=0.8, subsample=0.7, score=0.929174, total=  13.7s\n",
+      "[CV] colsample_bylevel=0.8, colsample_bytree=0.7, subsample=0.5 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  74 tasks      | elapsed:  4.4min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.7, colsample_bytree=0.8, subsample=0.7, score=0.929171, total=  13.7s\n",
+      "[CV] colsample_bylevel=0.8, colsample_bytree=0.7, subsample=0.5 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  75 tasks      | elapsed:  4.4min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.8, colsample_bytree=0.7, subsample=0.5, score=0.925965, total=  14.1s\n",
+      "[CV] colsample_bylevel=0.8, colsample_bytree=0.7, subsample=0.5 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  76 tasks      | elapsed:  4.6min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.8, colsample_bytree=0.7, subsample=0.5, score=0.923093, total=  14.0s\n",
+      "[CV] colsample_bylevel=0.8, colsample_bytree=0.9, subsample=0.8 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  77 tasks      | elapsed:  4.6min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.8, colsample_bytree=0.7, subsample=0.5, score=0.927416, total=  14.0s\n",
+      "[CV] colsample_bylevel=0.8, colsample_bytree=0.9, subsample=0.8 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  78 tasks      | elapsed:  4.7min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.8, colsample_bytree=0.7, subsample=0.5, score=0.929484, total=  14.0s\n",
+      "[CV] colsample_bylevel=0.8, colsample_bytree=0.9, subsample=0.8 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  79 tasks      | elapsed:  4.7min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.8, colsample_bytree=0.7, subsample=0.5, score=0.929512, total=  13.8s\n",
+      "[CV] colsample_bylevel=0.8, colsample_bytree=0.9, subsample=0.8 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  80 tasks      | elapsed:  4.9min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.8, colsample_bytree=0.9, subsample=0.8, score=0.926928, total=  15.8s\n",
+      "[CV] colsample_bylevel=0.8, colsample_bytree=0.9, subsample=0.8 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  81 tasks      | elapsed:  4.9min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.8, colsample_bytree=0.9, subsample=0.8, score=0.924445, total=  15.8s\n",
+      "[CV] colsample_bylevel=1.0, colsample_bytree=0.7, subsample=0.8 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  82 tasks      | elapsed:  4.9min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.8, colsample_bytree=0.9, subsample=0.8, score=0.928210, total=  15.8s\n",
+      "[CV] colsample_bylevel=1.0, colsample_bytree=0.7, subsample=0.8 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  83 tasks      | elapsed:  5.0min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.8, colsample_bytree=0.9, subsample=0.8, score=0.930227, total=  15.9s\n",
+      "[CV] colsample_bylevel=1.0, colsample_bytree=0.7, subsample=0.8 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  84 tasks      | elapsed:  5.1min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=0.8, colsample_bytree=0.9, subsample=0.8, score=0.929837, total=  15.9s\n",
+      "[CV] colsample_bylevel=1.0, colsample_bytree=0.7, subsample=0.8 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  85 tasks      | elapsed:  5.2min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=1.0, colsample_bytree=0.7, subsample=0.8, score=0.927108, total=  15.4s\n",
+      "[CV] colsample_bylevel=1.0, colsample_bytree=0.7, subsample=0.8 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  86 tasks      | elapsed:  5.2min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=1.0, colsample_bytree=0.7, subsample=0.8, score=0.926375, total=  15.5s\n",
+      "[CV] colsample_bylevel=1.0, colsample_bytree=0.6, subsample=0.6 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  87 tasks      | elapsed:  5.2min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=1.0, colsample_bytree=0.7, subsample=0.8, score=0.929230, total=  15.6s\n",
+      "[CV] colsample_bylevel=1.0, colsample_bytree=0.6, subsample=0.6 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  88 tasks      | elapsed:  5.4min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=1.0, colsample_bytree=0.7, subsample=0.8, score=0.930162, total=  15.4s\n",
+      "[CV] colsample_bylevel=1.0, colsample_bytree=0.6, subsample=0.6 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  89 tasks      | elapsed:  5.4min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=1.0, colsample_bytree=0.7, subsample=0.8, score=0.930441, total=  15.5s\n",
+      "[CV] colsample_bylevel=1.0, colsample_bytree=0.6, subsample=0.6 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  90 tasks      | elapsed:  5.5min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=1.0, colsample_bytree=0.6, subsample=0.6, score=0.926192, total=  14.8s\n",
+      "[CV] colsample_bylevel=1.0, colsample_bytree=0.6, subsample=0.6 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  91 tasks      | elapsed:  5.5min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=1.0, colsample_bytree=0.6, subsample=0.6, score=0.924071, total=  15.0s\n",
+      "[CV] colsample_bylevel=1.0, colsample_bytree=0.6, subsample=0.5 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  92 tasks      | elapsed:  5.7min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=1.0, colsample_bytree=0.6, subsample=0.6, score=0.928417, total=  15.2s\n",
+      "[CV] colsample_bylevel=1.0, colsample_bytree=0.6, subsample=0.5 ......\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  93 tasks      | elapsed:  5.7min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  colsample_bylevel=1.0, colsample_bytree=0.6, subsample=0.6, score=0.929918, total=  15.3s\n",
+      "[CV] colsample_bylevel=1.0, colsample_bytree=0.6, subsample=0.5 ......\n",
+      "[CV]  colsample_bylevel=1.0, colsample_bytree=0.6, subsample=0.6, score=0.929955, total=  15.5s\n",
+      "[CV] colsample_bylevel=1.0, colsample_bytree=0.6, subsample=0.5 ......\n",
+      "[CV]  colsample_bylevel=1.0, colsample_bytree=0.6, subsample=0.5, score=0.925610, total=  15.1s\n",
+      "[CV] colsample_bylevel=1.0, colsample_bytree=0.6, subsample=0.5 ......\n",
+      "[CV]  colsample_bylevel=1.0, colsample_bytree=0.6, subsample=0.5, score=0.923656, total=  15.1s\n",
+      "[CV]  colsample_bylevel=1.0, colsample_bytree=0.6, subsample=0.5, score=0.926645, total=  14.7s\n",
+      "[CV]  colsample_bylevel=1.0, colsample_bytree=0.6, subsample=0.5, score=0.929274, total=  14.6s\n",
+      "[CV]  colsample_bylevel=1.0, colsample_bytree=0.6, subsample=0.5, score=0.928908, total=  10.5s\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done 100 out of 100 | elapsed:  6.1min finished\n"
+     ]
+    },
+    {
+     "data": {
+      "text/plain": [
+       "RandomizedSearchCV(cv=5, error_score='raise',\n",
+       "          estimator=XGBClassifier(base_score=0.5, colsample_bylevel=1, colsample_bytree=1,\n",
+       "       gamma=0, learning_rate=0.1, max_delta_step=0, max_depth=3,\n",
+       "       min_child_weight=1, missing=None, n_estimators=500, nthread=-1,\n",
+       "       objective='binary:logistic', reg_alpha=0, reg_lambda=1,\n",
+       "       scale_pos_weight=1, seed=0, silent=True, subsample=1),\n",
+       "          fit_params={}, iid=True, n_iter=20, n_jobs=-1,\n",
+       "          param_distributions={'colsample_bylevel': [0.5, 0.6, 0.7, 0.8, 0.9, 1.0], 'colsample_bytree': [0.5, 0.6, 0.7, 0.8, 0.9, 1.0], 'subsample': [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]},\n",
+       "          pre_dispatch='2*n_jobs', random_state=None, refit=True,\n",
+       "          return_train_score=True, scoring='roc_auc', verbose=20)"
+      ]
+     },
+     "execution_count": 51,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "random_search.fit(x_train,y_train)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 52,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Model with rank: 1\n",
+      "Mean validation score: 0.929 (std: 0.00207)\n",
+      "Parameters: {'colsample_bylevel': 0.5, 'colsample_bytree': 0.6, 'subsample': 1.0}\n",
+      "\n",
+      "Model with rank: 2\n",
+      "Mean validation score: 0.929 (std: 0.00164)\n",
+      "Parameters: {'colsample_bylevel': 1.0, 'colsample_bytree': 0.7, 'subsample': 0.8}\n",
+      "\n",
+      "Model with rank: 3\n",
+      "Mean validation score: 0.929 (std: 0.00215)\n",
+      "Parameters: {'colsample_bylevel': 0.6, 'colsample_bytree': 1.0, 'subsample': 0.9}\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "report(random_search.cv_results_,3)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "bets values that we got for paramaeters are as follows : {'colsample_bylevel': 0.5, 'colsample_bytree': 0.6, 'subsample': 1.0}"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "lastly we can work on L2 and L1 penalty on leaf node score to further reduce overfit if there is any"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 54,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "xgb5=XGBClassifier(learning_rate=0.1,n_estimators=500,min_child_weight=1,gamma=0,max_depth=3,\n",
+    "                        scale_pos_weight=1,max_delta_step=0,\n",
+    "                   colsample_bylevel= 0.5, colsample_bytree= 0.6, subsample= 1.0\n",
+    "                  )"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 55,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "xgb_params={\n",
+    "            'reg_lambda':[i/10 for i in range(0,50)],\n",
+    "            'reg_alpha':[i/10 for i in range(0,50)]\n",
+    "            }"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 56,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "random_search=RandomizedSearchCV(xgb5,param_distributions=xgb_params,cv=5,n_iter=20,scoring='roc_auc',\n",
+    "                                n_jobs=-1,verbose=10)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 57,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Fitting 5 folds for each of 20 candidates, totalling 100 fits\n",
+      "[CV] reg_lambda=4.0, reg_alpha=4.3 ...................................\n",
+      "[CV] reg_lambda=4.0, reg_alpha=4.3 ...................................\n",
+      "[CV] reg_lambda=4.0, reg_alpha=4.3 ...................................\n",
+      "[CV] reg_lambda=4.0, reg_alpha=4.3 ...................................\n",
+      "[CV] .... reg_lambda=4.0, reg_alpha=4.3, score=0.925742, total=   7.8s\n",
+      "[CV] reg_lambda=4.0, reg_alpha=4.3 ...................................\n",
+      "[CV] .... reg_lambda=4.0, reg_alpha=4.3, score=0.921895, total=   8.0s\n",
+      "[CV] .... reg_lambda=4.0, reg_alpha=4.3, score=0.929589, total=   7.9s\n",
+      "[CV] reg_lambda=3.8, reg_alpha=3.3 ...................................\n",
+      "[CV] reg_lambda=3.8, reg_alpha=3.3 ...................................\n",
+      "[CV] .... reg_lambda=4.0, reg_alpha=4.3, score=0.927339, total=   7.9s\n",
+      "[CV] reg_lambda=3.8, reg_alpha=3.3 ...................................\n",
+      "[CV] .... reg_lambda=4.0, reg_alpha=4.3, score=0.929143, total=   8.1s\n",
+      "[CV] reg_lambda=3.8, reg_alpha=3.3 ...................................\n",
+      "[CV] .... reg_lambda=3.8, reg_alpha=3.3, score=0.926274, total=   8.0s\n",
+      "[CV] reg_lambda=3.8, reg_alpha=3.3 ...................................\n",
+      "[CV] .... reg_lambda=3.8, reg_alpha=3.3, score=0.922713, total=   8.0s\n",
+      "[CV] reg_lambda=2.2, reg_alpha=0.6 ...................................\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done   5 tasks      | elapsed:   17.3s\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV] .... reg_lambda=3.8, reg_alpha=3.3, score=0.927711, total=   8.1s\n",
+      "[CV] reg_lambda=2.2, reg_alpha=0.6 ...................................\n",
+      "[CV] .... reg_lambda=3.8, reg_alpha=3.3, score=0.929162, total=   7.8s\n",
+      "[CV] .... reg_lambda=3.8, reg_alpha=3.3, score=0.929502, total=   7.9s\n",
+      "[CV] reg_lambda=2.2, reg_alpha=0.6 ...................................\n",
+      "[CV] reg_lambda=2.2, reg_alpha=0.6 ...................................\n",
+      "[CV] .... reg_lambda=2.2, reg_alpha=0.6, score=0.926720, total=   7.8s\n",
+      "[CV] reg_lambda=2.2, reg_alpha=0.6 ...................................\n",
+      "[CV] .... reg_lambda=2.2, reg_alpha=0.6, score=0.924758, total=   7.8s\n",
+      "[CV] reg_lambda=1.5, reg_alpha=0.0 ...................................\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  10 tasks      | elapsed:   25.8s\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV] .... reg_lambda=2.2, reg_alpha=0.6, score=0.929167, total=   7.9s\n",
+      "[CV] .... reg_lambda=2.2, reg_alpha=0.6, score=0.930659, total=   7.9s\n",
+      "[CV] reg_lambda=1.5, reg_alpha=0.0 ...................................\n",
+      "[CV] reg_lambda=1.5, reg_alpha=0.0 ...................................\n",
+      "[CV] .... reg_lambda=1.5, reg_alpha=0.0, score=0.927295, total=   7.7s\n",
+      "[CV] .... reg_lambda=2.2, reg_alpha=0.6, score=0.930727, total=   7.8s\n",
+      "[CV] reg_lambda=1.5, reg_alpha=0.0 ...................................\n",
+      "[CV] reg_lambda=1.5, reg_alpha=0.0 ...................................\n",
+      "[CV] .... reg_lambda=1.5, reg_alpha=0.0, score=0.924754, total=   8.0s\n",
+      "[CV] .... reg_lambda=1.5, reg_alpha=0.0, score=0.930832, total=   7.9s\n",
+      "[CV] reg_lambda=0.1, reg_alpha=2.6 ...................................\n",
+      "[CV] .... reg_lambda=1.5, reg_alpha=0.0, score=0.930424, total=   7.9s\n",
+      "[CV] .... reg_lambda=1.5, reg_alpha=0.0, score=0.929161, total=   8.0s\n",
+      "[CV] reg_lambda=0.1, reg_alpha=2.6 ...................................\n",
+      "[CV] reg_lambda=0.1, reg_alpha=2.6 ...................................\n",
+      "[CV] reg_lambda=0.1, reg_alpha=2.6 ...................................\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  17 tasks      | elapsed:   42.8s\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV] .... reg_lambda=0.1, reg_alpha=2.6, score=0.926756, total=   8.2s\n",
+      "[CV] reg_lambda=0.1, reg_alpha=2.6 ...................................\n",
+      "[CV] .... reg_lambda=0.1, reg_alpha=2.6, score=0.924354, total=   8.2s\n",
+      "[CV] .... reg_lambda=0.1, reg_alpha=2.6, score=0.930498, total=   8.2s\n",
+      "[CV] .... reg_lambda=0.1, reg_alpha=2.6, score=0.929090, total=   8.3s\n",
+      "[CV] reg_lambda=2.3, reg_alpha=0.3 ...................................\n",
+      "[CV] reg_lambda=2.3, reg_alpha=0.3 ...................................\n",
+      "[CV] reg_lambda=2.3, reg_alpha=0.3 ...................................\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  24 tasks      | elapsed:   51.9s\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV] .... reg_lambda=2.3, reg_alpha=0.3, score=0.926783, total=   8.6s\n",
+      "[CV] reg_lambda=2.3, reg_alpha=0.3 ...................................\n",
+      "[CV] .... reg_lambda=0.1, reg_alpha=2.6, score=0.930109, total=   8.7s\n",
+      "[CV] reg_lambda=2.3, reg_alpha=0.3 ...................................\n",
+      "[CV] .... reg_lambda=2.3, reg_alpha=0.3, score=0.929030, total=   8.5s\n",
+      "[CV] reg_lambda=3.3, reg_alpha=2.3 ...................................\n",
+      "[CV] .... reg_lambda=2.3, reg_alpha=0.3, score=0.925127, total=   8.6s\n",
+      "[CV] reg_lambda=3.3, reg_alpha=2.3 ...................................\n",
+      "[CV] .... reg_lambda=2.3, reg_alpha=0.3, score=0.930820, total=   8.3s\n",
+      "[CV] reg_lambda=3.3, reg_alpha=2.3 ...................................\n",
+      "[CV] .... reg_lambda=2.3, reg_alpha=0.3, score=0.930155, total=   8.3s\n",
+      "[CV] .... reg_lambda=3.3, reg_alpha=2.3, score=0.926529, total=   8.2s\n",
+      "[CV] reg_lambda=3.3, reg_alpha=2.3 ...................................\n",
+      "[CV] reg_lambda=3.3, reg_alpha=2.3 ...................................\n",
+      "[CV] .... reg_lambda=3.3, reg_alpha=2.3, score=0.923277, total=   8.3s\n",
+      "[CV] reg_lambda=3.3, reg_alpha=4.7 ...................................\n",
+      "[CV] .... reg_lambda=3.3, reg_alpha=2.3, score=0.928420, total=   8.2s\n",
+      "[CV] reg_lambda=3.3, reg_alpha=4.7 ...................................\n",
+      "[CV] .... reg_lambda=3.3, reg_alpha=2.3, score=0.929721, total=   8.2s\n",
+      "[CV] .... reg_lambda=3.3, reg_alpha=2.3, score=0.930236, total=   8.2s\n",
+      "[CV] reg_lambda=3.3, reg_alpha=4.7 ...................................\n",
+      "[CV] reg_lambda=3.3, reg_alpha=4.7 ...................................\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  33 tasks      | elapsed:  1.3min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV] .... reg_lambda=3.3, reg_alpha=4.7, score=0.925854, total=   8.1s\n",
+      "[CV] reg_lambda=3.3, reg_alpha=4.7 ...................................\n",
+      "[CV] .... reg_lambda=3.3, reg_alpha=4.7, score=0.921960, total=   8.6s\n",
+      "[CV] reg_lambda=0.3, reg_alpha=2.6 ...................................\n",
+      "[CV] .... reg_lambda=3.3, reg_alpha=4.7, score=0.927096, total=   8.5s\n",
+      "[CV] .... reg_lambda=3.3, reg_alpha=4.7, score=0.929537, total=   8.5s\n",
+      "[CV] reg_lambda=0.3, reg_alpha=2.6 ...................................\n",
+      "[CV] reg_lambda=0.3, reg_alpha=2.6 ...................................\n",
+      "[CV] .... reg_lambda=3.3, reg_alpha=4.7, score=0.929231, total=   8.5s\n",
+      "[CV] reg_lambda=0.3, reg_alpha=2.6 ...................................\n",
+      "[CV] .... reg_lambda=0.3, reg_alpha=2.6, score=0.927037, total=   8.0s\n",
+      "[CV] reg_lambda=0.3, reg_alpha=2.6 ...................................\n",
+      "[CV] .... reg_lambda=0.3, reg_alpha=2.6, score=0.924236, total=   8.1s\n",
+      "[CV] .... reg_lambda=0.3, reg_alpha=2.6, score=0.928751, total=   8.0s\n",
+      "[CV] reg_lambda=2.6, reg_alpha=3.4 ...................................\n",
+      "[CV] reg_lambda=2.6, reg_alpha=3.4 ...................................\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  42 tasks      | elapsed:  1.6min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV] .... reg_lambda=0.3, reg_alpha=2.6, score=0.930206, total=   8.0s\n",
+      "[CV] reg_lambda=2.6, reg_alpha=3.4 ...................................\n",
+      "[CV] .... reg_lambda=0.3, reg_alpha=2.6, score=0.929843, total=   8.2s\n",
+      "[CV] reg_lambda=2.6, reg_alpha=3.4 ...................................\n",
+      "[CV] .... reg_lambda=2.6, reg_alpha=3.4, score=0.926348, total=   8.2s\n",
+      "[CV] reg_lambda=2.6, reg_alpha=3.4 ...................................\n",
+      "[CV] .... reg_lambda=2.6, reg_alpha=3.4, score=0.923071, total=   8.2s\n",
+      "[CV] reg_lambda=2.9, reg_alpha=1.2 ...................................\n",
+      "[CV] .... reg_lambda=2.6, reg_alpha=3.4, score=0.927831, total=   8.2s\n",
+      "[CV] reg_lambda=2.9, reg_alpha=1.2 ...................................\n",
+      "[CV] .... reg_lambda=2.6, reg_alpha=3.4, score=0.929921, total=   8.4s\n",
+      "[CV] reg_lambda=2.9, reg_alpha=1.2 ...................................\n",
+      "[CV] .... reg_lambda=2.9, reg_alpha=1.2, score=0.927234, total=   8.4s\n",
+      "[CV] .... reg_lambda=2.6, reg_alpha=3.4, score=0.929595, total=   8.5s\n",
+      "[CV] reg_lambda=2.9, reg_alpha=1.2 ...................................\n",
+      "[CV] reg_lambda=2.9, reg_alpha=1.2 ...................................\n",
+      "[CV] .... reg_lambda=2.9, reg_alpha=1.2, score=0.924475, total=   8.3s\n",
+      "[CV] reg_lambda=3.4, reg_alpha=0.2 ...................................\n",
+      "[CV] .... reg_lambda=2.9, reg_alpha=1.2, score=0.928705, total=   8.2s\n",
+      "[CV] reg_lambda=3.4, reg_alpha=0.2 ...................................\n",
+      "[CV] .... reg_lambda=2.9, reg_alpha=1.2, score=0.930566, total=   8.1s\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  53 tasks      | elapsed:  2.0min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV] reg_lambda=3.4, reg_alpha=0.2 ...................................\n",
+      "[CV] .... reg_lambda=2.9, reg_alpha=1.2, score=0.930158, total=   8.2s\n",
+      "[CV] .... reg_lambda=3.4, reg_alpha=0.2, score=0.927024, total=   8.1s\n",
+      "[CV] reg_lambda=3.4, reg_alpha=0.2 ...................................\n",
+      "[CV] reg_lambda=3.4, reg_alpha=0.2 ...................................\n",
+      "[CV] .... reg_lambda=3.4, reg_alpha=0.2, score=0.924918, total=   8.0s\n",
+      "[CV] reg_lambda=3.5, reg_alpha=1.9 ...................................\n",
+      "[CV] .... reg_lambda=3.4, reg_alpha=0.2, score=0.929279, total=   8.0s\n",
+      "[CV] reg_lambda=3.5, reg_alpha=1.9 ...................................\n",
+      "[CV] .... reg_lambda=3.4, reg_alpha=0.2, score=0.930918, total=   8.0s\n",
+      "[CV] reg_lambda=3.5, reg_alpha=1.9 ...................................\n",
+      "[CV] .... reg_lambda=3.4, reg_alpha=0.2, score=0.930136, total=   8.0s\n",
+      "[CV] reg_lambda=3.5, reg_alpha=1.9 ...................................\n",
+      "[CV] .... reg_lambda=3.5, reg_alpha=1.9, score=0.926861, total=   8.0s\n",
+      "[CV] reg_lambda=3.5, reg_alpha=1.9 ...................................\n",
+      "[CV] .... reg_lambda=3.5, reg_alpha=1.9, score=0.923809, total=   8.1s\n",
+      "[CV] reg_lambda=3.6, reg_alpha=3.8 ...................................\n",
+      "[CV] .... reg_lambda=3.5, reg_alpha=1.9, score=0.928359, total=   8.1s\n",
+      "[CV] reg_lambda=3.6, reg_alpha=3.8 ...................................\n",
+      "[CV] .... reg_lambda=3.5, reg_alpha=1.9, score=0.930094, total=   8.1s\n",
+      "[CV] reg_lambda=3.6, reg_alpha=3.8 ...................................\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  64 tasks      | elapsed:  2.3min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV] .... reg_lambda=3.5, reg_alpha=1.9, score=0.929993, total=   8.0s\n",
+      "[CV] reg_lambda=3.6, reg_alpha=3.8 ...................................\n",
+      "[CV] .... reg_lambda=3.6, reg_alpha=3.8, score=0.926165, total=   8.1s\n",
+      "[CV] reg_lambda=3.6, reg_alpha=3.8 ...................................\n",
+      "[CV] .... reg_lambda=3.6, reg_alpha=3.8, score=0.921946, total=   8.1s\n",
+      "[CV] reg_lambda=3.8, reg_alpha=1.3 ...................................\n",
+      "[CV] .... reg_lambda=3.6, reg_alpha=3.8, score=0.927608, total=   8.2s\n",
+      "[CV] reg_lambda=3.8, reg_alpha=1.3 ...................................\n",
+      "[CV] .... reg_lambda=3.6, reg_alpha=3.8, score=0.929936, total=   8.1s\n",
+      "[CV] reg_lambda=3.8, reg_alpha=1.3 ...................................\n",
+      "[CV] .... reg_lambda=3.6, reg_alpha=3.8, score=0.929164, total=   8.1s\n",
+      "[CV] reg_lambda=3.8, reg_alpha=1.3 ...................................\n",
+      "[CV] .... reg_lambda=3.8, reg_alpha=1.3, score=0.926752, total=   8.1s\n",
+      "[CV] reg_lambda=3.8, reg_alpha=1.3 ...................................\n",
+      "[CV] .... reg_lambda=3.8, reg_alpha=1.3, score=0.923739, total=   8.1s\n",
+      "[CV] reg_lambda=2.4, reg_alpha=1.0 ...................................\n",
+      "[CV] .... reg_lambda=3.8, reg_alpha=1.3, score=0.928635, total=   8.2s\n",
+      "[CV] reg_lambda=2.4, reg_alpha=1.0 ...................................\n",
+      "[CV] .... reg_lambda=3.8, reg_alpha=1.3, score=0.930384, total=   8.1s\n",
+      "[CV] reg_lambda=2.4, reg_alpha=1.0 ...................................\n",
+      "[CV] .... reg_lambda=3.8, reg_alpha=1.3, score=0.930626, total=   8.1s\n",
+      "[CV] reg_lambda=2.4, reg_alpha=1.0 ...................................\n",
+      "[CV] .... reg_lambda=2.4, reg_alpha=1.0, score=0.926959, total=   8.1s\n",
+      "[CV] reg_lambda=2.4, reg_alpha=1.0 ...................................\n",
+      "[CV] .... reg_lambda=2.4, reg_alpha=1.0, score=0.924235, total=   8.5s\n",
+      "[CV] reg_lambda=4.6, reg_alpha=4.0 ...................................\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  77 tasks      | elapsed:  2.9min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV] .... reg_lambda=2.4, reg_alpha=1.0, score=0.928689, total=   8.5s\n",
+      "[CV] reg_lambda=4.6, reg_alpha=4.0 ...................................\n",
+      "[CV] .... reg_lambda=2.4, reg_alpha=1.0, score=0.930561, total=   8.6s\n",
+      "[CV] reg_lambda=4.6, reg_alpha=4.0 ...................................\n",
+      "[CV] .... reg_lambda=2.4, reg_alpha=1.0, score=0.930099, total=   8.6s\n",
+      "[CV] reg_lambda=4.6, reg_alpha=4.0 ...................................\n",
+      "[CV] .... reg_lambda=4.6, reg_alpha=4.0, score=0.926238, total=   8.3s\n",
+      "[CV] reg_lambda=4.6, reg_alpha=4.0 ...................................\n",
+      "[CV] .... reg_lambda=4.6, reg_alpha=4.0, score=0.922214, total=   8.3s\n",
+      "[CV] reg_lambda=2.1, reg_alpha=0.8 ...................................\n",
+      "[CV] .... reg_lambda=4.6, reg_alpha=4.0, score=0.927489, total=   8.3s\n",
+      "[CV] reg_lambda=2.1, reg_alpha=0.8 ...................................\n",
+      "[CV] .... reg_lambda=4.6, reg_alpha=4.0, score=0.929477, total=   8.2s\n",
+      "[CV] reg_lambda=2.1, reg_alpha=0.8 ...................................\n",
+      "[CV] .... reg_lambda=4.6, reg_alpha=4.0, score=0.929010, total=   8.1s\n",
+      "[CV] reg_lambda=2.1, reg_alpha=0.8 ...................................\n",
+      "[CV] .... reg_lambda=2.1, reg_alpha=0.8, score=0.927033, total=   8.1s\n",
+      "[CV] reg_lambda=2.1, reg_alpha=0.8 ...................................\n",
+      "[CV] .... reg_lambda=2.1, reg_alpha=0.8, score=0.925106, total=   8.1s\n",
+      "[CV] reg_lambda=4.0, reg_alpha=0.4 ...................................\n",
+      "[CV] .... reg_lambda=2.1, reg_alpha=0.8, score=0.928697, total=   8.1s\n",
+      "[CV] reg_lambda=4.0, reg_alpha=0.4 ...................................\n",
+      "[CV] .... reg_lambda=2.1, reg_alpha=0.8, score=0.930581, total=   8.2s\n",
+      "[CV] reg_lambda=4.0, reg_alpha=0.4 ...................................\n",
+      "[CV] .... reg_lambda=2.1, reg_alpha=0.8, score=0.930709, total=   8.3s\n",
+      "[CV] reg_lambda=4.0, reg_alpha=0.4 ...................................\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  90 tasks      | elapsed:  3.4min\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV] .... reg_lambda=4.0, reg_alpha=0.4, score=0.926880, total=   8.3s\n",
+      "[CV] reg_lambda=4.0, reg_alpha=0.4 ...................................\n",
+      "[CV] .... reg_lambda=4.0, reg_alpha=0.4, score=0.924286, total=   8.2s\n",
+      "[CV] reg_lambda=2.6, reg_alpha=1.3 ...................................\n",
+      "[CV] .... reg_lambda=4.0, reg_alpha=0.4, score=0.928870, total=   8.1s\n",
+      "[CV] reg_lambda=2.6, reg_alpha=1.3 ...................................\n",
+      "[CV] .... reg_lambda=4.0, reg_alpha=0.4, score=0.930498, total=   8.0s\n",
+      "[CV] reg_lambda=2.6, reg_alpha=1.3 ...................................\n",
+      "[CV] .... reg_lambda=4.0, reg_alpha=0.4, score=0.930190, total=   8.1s\n",
+      "[CV] reg_lambda=2.6, reg_alpha=1.3 ...................................\n",
+      "[CV] .... reg_lambda=2.6, reg_alpha=1.3, score=0.926828, total=   8.1s\n",
+      "[CV] reg_lambda=2.6, reg_alpha=1.3 ...................................\n",
+      "[CV] .... reg_lambda=2.6, reg_alpha=1.3, score=0.924778, total=   8.1s\n",
+      "[CV] .... reg_lambda=2.6, reg_alpha=1.3, score=0.928696, total=   8.1s\n",
+      "[CV] .... reg_lambda=2.6, reg_alpha=1.3, score=0.930443, total=   8.1s\n",
+      "[CV] .... reg_lambda=2.6, reg_alpha=1.3, score=0.930142, total=   8.1s\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done 100 out of 100 | elapsed:  3.7min finished\n"
+     ]
+    },
+    {
+     "data": {
+      "text/plain": [
+       "RandomizedSearchCV(cv=5, error_score='raise',\n",
+       "          estimator=XGBClassifier(base_score=0.5, colsample_bylevel=0.5, colsample_bytree=0.6,\n",
+       "       gamma=0, learning_rate=0.1, max_delta_step=0, max_depth=3,\n",
+       "       min_child_weight=1, missing=None, n_estimators=500, nthread=-1,\n",
+       "       objective='binary:logistic', reg_alpha=0, reg_lambda=1,\n",
+       "       scale_pos_weight=1, seed=0, silent=True, subsample=1.0),\n",
+       "          fit_params={}, iid=True, n_iter=20, n_jobs=-1,\n",
+       "          param_distributions={'reg_lambda': [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.0, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.0, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9], 'reg_alpha': ...3.0, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4.0, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9]},\n",
+       "          pre_dispatch='2*n_jobs', random_state=None, refit=True,\n",
+       "          return_train_score=True, scoring='roc_auc', verbose=10)"
+      ]
+     },
+     "execution_count": 57,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "random_search.fit(x_train,y_train)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 58,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Model with rank: 1\n",
+      "Mean validation score: 0.928 (std: 0.00224)\n",
+      "Parameters: {'reg_lambda': 1.5, 'reg_alpha': 0.0}\n",
+      "\n",
+      "Model with rank: 2\n",
+      "Mean validation score: 0.928 (std: 0.00220)\n",
+      "Parameters: {'reg_lambda': 3.4, 'reg_alpha': 0.2}\n",
+      "\n",
+      "Model with rank: 3\n",
+      "Mean validation score: 0.928 (std: 0.00214)\n",
+      "Parameters: {'reg_lambda': 2.1, 'reg_alpha': 0.8}\n",
+      "\n"
+     ]
+    }
+   ],
+   "source": [
+    "report(random_search.cv_results_,3)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "The best value that we got here is {'reg_lambda': 1.5, 'reg_alpha': 0.0}, but the performance has gone down. May be the default was doing better and wasnt picked as one of the candidates here in the random_search. we'll go with those defaults values instead"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 59,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "xgb6=XGBClassifier(learning_rate=0.1,n_estimators=500,min_child_weight=1,gamma=0,max_depth=3,\n",
+    "                        scale_pos_weight=1,max_delta_step=0,\n",
+    "                   colsample_bylevel= 0.5, colsample_bytree= 0.6, subsample= 1.0,\n",
+    "                  reg_lambda=1,reg_alpha=0)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "If we want to simply get cv performance of a model , without having to select any parameters we can make use of cross_validation_score function"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 60,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "from sklearn.model_selection import cross_val_score"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 62,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV]  ................................................................\n",
+      "[CV]  ................................................................\n",
+      "[CV]  ................................................................\n",
+      "[CV]  ................................................................\n",
+      "[CV] ................................. , score=0.921770, total=   8.6s\n",
+      "[CV] ................................. , score=0.930709, total=   8.7s\n",
+      "[CV] ................................. , score=0.925901, total=   8.7s\n",
+      "[CV] ................................. , score=0.929515, total=   8.7s\n",
+      "[CV]  ................................................................\n",
+      "[CV]  ................................................................\n",
+      "[CV]  ................................................................\n",
+      "[CV]  ................................................................\n",
+      "[CV] ................................. , score=0.928820, total=   9.1s\n",
+      "[CV]  ................................................................\n",
+      "[CV] ................................. , score=0.930183, total=   9.2s\n",
+      "[CV] ................................. , score=0.931283, total=   9.2s\n",
+      "[CV]  ................................................................\n",
+      "[CV] ................................. , score=0.932972, total=   9.2s\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done   5 out of  10 | elapsed:   18.0s remaining:   18.0s\n",
+      "[Parallel(n_jobs=-1)]: Done   7 out of  10 | elapsed:   18.1s remaining:    7.8s\n"
+     ]
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "[CV] ................................. , score=0.932566, total=   5.2s\n",
+      "[CV] ................................. , score=0.929474, total=   5.2s\n"
+     ]
+    },
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "[Parallel(n_jobs=-1)]: Done  10 out of  10 | elapsed:   23.3s finished\n"
+     ]
+    },
+    {
+     "data": {
+      "text/plain": [
+       "array([0.92951477, 0.92590096, 0.93070889, 0.92176974, 0.92882013,\n",
+       "       0.93128318, 0.93018259, 0.93297173, 0.93256565, 0.92947388])"
+      ]
+     },
+     "execution_count": 62,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "cross_val_score(xgb6,x_train,y_train,scoring='roc_auc',verbose=10,n_jobs=-1,cv=10)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 63,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "scores=[0.92951477, 0.92590096, 0.93070889, 0.92176974, 0.92882013,\n",
+    "       0.93128318, 0.93018259, 0.93297173, 0.93256565, 0.92947388]"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 65,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": [
+    "import numpy as np"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 66,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "0.929319152"
+      ]
+     },
+     "execution_count": 66,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "np.mean(scores)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 67,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "0.0031528442142034264"
+      ]
+     },
+     "execution_count": 67,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "np.std(scores)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {
+    "collapsed": true
+   },
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python [Root]",
+   "language": "python",
+   "name": "Python [Root]"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.5.3"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 2
+}
